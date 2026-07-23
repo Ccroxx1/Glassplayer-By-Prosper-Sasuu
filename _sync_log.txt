@@ -1,0 +1,90 @@
+Initialized native services in: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\native
+Initialized jansi services in: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\native
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Starting process 'Gradle build daemon'. Working directory: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\daemon\9.3.1 Command: C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot\bin\java.exe --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.xml/javax.xml.namespace=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED -Xmx4g -Dfile.encoding=UTF-8 -Duser.country=US -Duser.language=en -Duser.variant -cp C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1\lib\gradle-daemon-main-9.3.1.jar -javaagent:C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1\lib\agents\gradle-instrumentation-agent-9.3.1.jar org.gradle.launcher.daemon.bootstrap.GradleDaemon 9.3.1
+Successfully started process 'Gradle build daemon'
+An attempt to start the daemon took 19.726 secs.
+The client will now receive all logging from the daemon (pid: 13440). The daemon log file: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\daemon\9.3.1\daemon-13440.out.log
+Daemon will be stopped at the end of the build 
+Using 4 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=true, configureOnDemand=false, configurationCache=true, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=true, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Received JVM installation metadata from 'C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot': {JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot, JAVA_VERSION=17.0.19, JAVA_VENDOR=Microsoft, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.19+10-LTS, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.19+10-LTS, VM_VENDOR=Microsoft, OS_ARCH=amd64}
+Encryption key source: default Gradle keystore (pkcs12)
+Calculating task graph as no cached configuration is available for tasks: projects
+Watching the file system is configured to be enabled if available
+Now considering [C:\Users\Sasuu\Downloads\glassmorphic-audio-player] as hierarchies to watch
+File system watching is active
+Starting Build
+Resolved plugin [id: 'org.gradle.toolchains.foojay-resolver-convention', version: '1.0.0']
+Settings evaluated using settings file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player\settings.gradle.kts'.
+Using local directory build cache for the root build (location = C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\caches\build-cache-1, remove unused entries = after 7 days).
+Projects loaded. Root project using build file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player\build.gradle.kts'.
+Included projects: [root project 'Glassmorphic Audio Player', project ':app']
+
+> Configure project :
+Evaluating root project 'Glassmorphic Audio Player' using build file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player\build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.0.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.2.10', apply: false]
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.5', apply: false]
+Resolved plugin [id: 'io.github.takahirom.roborazzi', version: '1.59.0', apply: false]
+
+> Configure project :app
+Evaluating project ':app' using build file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player\app\build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.0.0']
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.2.10']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.5']
+Resolved plugin [id: 'io.github.takahirom.roborazzi', version: '1.59.0']
+Build 5c727745-4c94-4913-8bc6-93886ce9bbc4 is started
+Using default execution profile
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+All projects evaluated.
+Task name matched 'projects'
+Selected primary task 'projects' from project :
+Tasks to be executed: [task ':projects']
+Tasks that were excluded: []
+Build 5c727745-4c94-4913-8bc6-93886ce9bbc4 is closed
+Using local directory build cache for the root build (location = C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\cd8081428914aa1d7544ffab03aba1c7\gradle\caches\build-cache-1, remove unused entries = after 7 days).
+Ignoring listeners of task graph ready event, as this build (:) has already executed work.
+Resolve mutations for :projects (Thread[included builds,5,main]) started.
+:projects (Thread[included builds,5,main]) started.
+
+> Task :projects
+Caching disabled for task ':projects' because:
+  Not worth caching
+Task ':projects' is not up-to-date because:
+  Task is untracked because: Uses the whole project state as an input
+
+Projects:
+
+------------------------------------------------------------
+Root project 'Glassmorphic Audio Player'
+------------------------------------------------------------
+
+Location: C:\Users\Sasuu\Downloads\glassmorphic-audio-player
+
+Project hierarchy:
+
+Root project 'Glassmorphic Audio Player'
+\--- Project ':app'
+
+Project locations:
+
+project ':app' - \app
+
+To see a list of the tasks of a project, run gradlew <project-path>:tasks
+For example, try running gradlew :app:tasks
+Build 9bb5a7cc-bdb6-4b56-9758-aa58ec579ee7 is started
+Build 9bb5a7cc-bdb6-4b56-9758-aa58ec579ee7 is closed
+
+See the complete report at file:///C:/Users/Sasuu/Downloads/glassmorphic-audio-player/build/reports/configuration-cache/80ok34d3ze5y6awd2of713llu/19ax2jv5xq10q55bzuyio79ty/configuration-cache-report.html
+
+BUILD SUCCESSFUL in 2m 14s
+1 actionable task: 1 executed
+Watched directory hierarchies: [C:\Users\Sasuu\Downloads\glassmorphic-audio-player]
+Configuration cache entry stored.
+Configuration Cache (C:\Users\Sasuu\Downloads\glassmorphic-audio-player\.gradle\configuration-cache) removing files not accessed on or after Mon Jul 13 02:13:52 GMT 2026.
+Configuration Cache (C:\Users\Sasuu\Downloads\glassmorphic-audio-player\.gradle\configuration-cache) cleanup deleted 0 files/directories.
+Configuration Cache (C:\Users\Sasuu\Downloads\glassmorphic-audio-player\.gradle\configuration-cache) cleaned up in 0.061 secs.
