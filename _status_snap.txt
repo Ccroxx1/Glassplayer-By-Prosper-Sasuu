@@ -1,0 +1,7 @@
+Downloading https://services.gradle.org/distributions/gradle-9.0-bin.zip
+............10%.............20%.............30%.............40%.............50%...........
+cwd: "C:\\Users\\Sasuu\\Downloads\\glassmorphic-audio-player"
+command: "cmd /c \"set JAVA_HOME=C:\\Program Files\\Android\\Android Studio\\jbr&& set ANDROID_HOME=C:\\Users\\Sasuu\\AppData\\Local\\Android\\Sdk&& cd /d C:\\Users\\Sasuu\\Downloads\\glassmorphic-audio-player&& gradlew.bat :app:assembleDebug --no-daemon --stacktrace > _apk_build.log 2>&1& echo EXIT_CODE=%ERRORLEVEL%>> _apk_build.log& echo DONE>> _apk_build.log\""
+started_at: 2026-07-18T15:02:43.408Z
+running_for_ms: 995547   
+---

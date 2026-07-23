@@ -1,0 +1,4 @@
+﻿jar=True
+jarSize=45457
+bat=True
+batSize=2844

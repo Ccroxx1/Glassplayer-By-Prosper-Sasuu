@@ -1,0 +1,2 @@
+FINDSTR: Cannot open FAILED\ /C:\FAILURE:\ /C:\EXIT\ C:\Users\Sasuu\Downloads\glassmorphic-audio-player\_gradle_out.txt 
+SIZE=

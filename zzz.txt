@@ -1,0 +1,8 @@
+ZZZB64=Jy5cZ3JhZGxldy5iYXQnIGlzIG5vdCByZWNvZ25pemVkIGFzIGFuIGludGVybmFsIG9yIGV4dGVybmFsIGNvbW1hbmQsDQpvcGVyYWJsZSBwcm9ncmFtIG9yIGJhdGNoIGZpbGUuDQo=
+ZZZLEN=104
+ZZZB64=Jy5cZ3JhZGxldy5iYXQnIGlzIG5vdCByZWNvZ25pemVkIGFzIGFuIGludGVybmFsIG9yIGV4dGVybmFsIGNvbW1hbmQsDQpvcGVyYWJsZSBwcm9ncmFtIG9yIGJhdGNoIGZpbGUuDQo=
+ZZZLEN=104
+ZZZB64=Jy5cZ3JhZGxldy5iYXQnIGlzIG5vdCByZWNvZ25pemVkIGFzIGFuIGludGVybmFsIG9yIGV4dGVybmFsIGNvbW1hbmQsDQpvcGVyYWJsZSBwcm9ncmFtIG9yIGJhdGNoIGZpbGUuDQo=
+ZZZLEN=104
+ZZZRESULT=EXIST_GRADLEW_False || EXIST_OUTPUTS_False || L01_'._gradlew.bat' is not recognized as an internal or external command, || L02_operable program or batch file
+NAMES=EXIST_GRADLEW_False || EXIST_OUTPUTS_False || L01_'._gradlew.bat' is not recognized as an internal or external command, || L02_operable program or batch file
