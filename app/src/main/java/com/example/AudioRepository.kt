@@ -1,8 +1,12 @@
 package com.example
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 
-class AudioRepository(private val audioDao: AudioDao) {
+class AudioRepository(
+    private val audioDao: AudioDao,
+    private val database: AudioDatabase
+) {
     val allTracks: Flow<List<AudioTrackEntity>> = audioDao.getAllTracks()
     val favorites: Flow<List<AudioTrackEntity>> = audioDao.getFavoriteTracks()
     val recentTracks: Flow<List<AudioTrackEntity>> = audioDao.getRecentTracks()
@@ -18,6 +22,15 @@ class AudioRepository(private val audioDao: AudioDao) {
         return audioDao.getTracksInPlaylist(playlistId)
     }
 
+    suspend fun getTrackByUri(uri: String): AudioTrackEntity? = audioDao.getTrackByUri(uri)
+
+    /** Returns tracks for [uris] in the same order as requested (missing URIs omitted). */
+    suspend fun getTracksByUrisOrdered(uris: List<String>): List<AudioTrackEntity> {
+        if (uris.isEmpty()) return emptyList()
+        val found = audioDao.getTracksByUris(uris).associateBy { it.uri }
+        return uris.mapNotNull { found[it] }
+    }
+
     suspend fun upsertTrack(track: AudioTrackEntity): Long {
         val existing = audioDao.getTrackByUri(track.uri)
         return if (existing != null) {
@@ -30,7 +43,9 @@ class AudioRepository(private val audioDao: AudioDao) {
                 folderName = track.folderName,
                 albumArtUri = track.albumArtUri,
                 category = track.category,
-                dateAdded = track.dateAdded
+                dateAdded = track.dateAdded,
+                dateModified = track.dateModified,
+                year = track.year
             )
             existing.id.toLong()
         } else {
@@ -40,27 +55,17 @@ class AudioRepository(private val audioDao: AudioDao) {
 
     suspend fun insertTrack(track: AudioTrackEntity): Long = upsertTrack(track)
 
+    /** Single Room transaction so the UI gets one Flow emit instead of one per track. */
     suspend fun insertTracks(tracks: List<AudioTrackEntity>) {
-        tracks.forEach { upsertTrack(it) }
+        if (tracks.isEmpty()) return
+        database.withTransaction {
+            tracks.forEach { upsertTrack(it) }
+        }
     }
 
-    suspend fun ensureSynthTrack() {
-        val uri = SYNTH_URI
-        if (audioDao.getTrackByUri(uri) == null) {
-            audioDao.insertTrack(
-                AudioTrackEntity(
-                    uri = uri,
-                    title = "Neon Pulse",
-                    artist = "GlassPlayer Synth",
-                    durationMs = 180_000L,
-                    dateAdded = System.currentTimeMillis(),
-                    category = "My Device",
-                    album = "Procedural",
-                    folderName = "Synth",
-                    lyrics = SYNTH_LYRICS
-                )
-            )
-        }
+    /** Removes the built-in Neon Pulse procedural track if present. */
+    suspend fun removeSynthTrack() {
+        audioDao.deleteTrackByUri(SYNTH_URI)
     }
 
     suspend fun toggleFavorite(id: Int, isFavorite: Boolean) {

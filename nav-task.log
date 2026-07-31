@@ -1,0 +1,100 @@
+﻿Initialized native services in: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\native
+Initialized jansi services in: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\native
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Starting process 'Gradle build daemon'. Working directory: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\daemon\9.3.1 Command: C:\Program Files\Android\Android Studio\jbr\bin\java.exe --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.xml/javax.xml.namespace=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED -Xmx4g -Dfile.encoding=UTF-8 -Duser.country=US -Duser.language=en -Duser.variant -cp C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1\lib\gradle-daemon-main-9.3.1.jar -javaagent:C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1\lib\agents\gradle-instrumentation-agent-9.3.1.jar org.gradle.launcher.daemon.bootstrap.GradleDaemon 9.3.1
+Successfully started process 'Gradle build daemon'
+An attempt to start the daemon took 5.631 secs.
+The client will now receive all logging from the daemon (pid: 12152). The daemon log file: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\daemon\9.3.1\daemon-12152.out.log
+Daemon will be stopped at the end of the build 
+Using 4 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=true, configureOnDemand=false, configurationCache=false, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=true, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Received JVM installation metadata from 'C:\Program Files\Android\Android Studio\jbr': {JAVA_HOME=C:\Program Files\Android\Android Studio\jbr, JAVA_VERSION=21.0.8, JAVA_VENDOR=JetBrains s.r.o., RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=21.0.8+-14196175-b1038.72, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=21.0.8+-14196175-b1038.72, VM_VENDOR=JetBrains s.r.o., OS_ARCH=amd64}
+Watching the file system is configured to be enabled if available
+Now considering [C:\Users\Sasuu\Downloads\glassmorphic-audio-player2] as hierarchies to watch
+File system watching is active
+Starting Build
+Resolved plugin [id: 'org.gradle.toolchains.foojay-resolver-convention', version: '1.0.0']
+Settings evaluated using settings file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player2\settings.gradle.kts'.
+Using local directory build cache for the root build (location = C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\build-cache-1, remove unused entries = after 7 days).
+Projects loaded. Root project using build file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player2\build.gradle.kts'.
+Included projects: [root project 'Glassmorphic Audio Player', project ':app']
+
+> Configure project :
+Evaluating root project 'Glassmorphic Audio Player' using build file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player2\build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.0.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.2.10', apply: false]
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.5', apply: false]
+Resolved plugin [id: 'io.github.takahirom.roborazzi', version: '1.59.0', apply: false]
+
+> Configure project :app
+Evaluating project ':app' using build file 'C:\Users\Sasuu\Downloads\glassmorphic-audio-player2\app\build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.0.0']
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.2.10']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.5']
+Resolved plugin [id: 'io.github.takahirom.roborazzi', version: '1.59.0']
+Build 4ef5fc88-96b7-4f6a-b0a4-7126b52d0f41 is started
+Using default execution profile
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+All projects evaluated.
+Task path ':app:processDebugNavigationResources' matched project ':app'
+Task name matched 'processDebugNavigationResources'
+Selected primary task 'processDebugNavigationResources' from project :app
+Tasks to be executed: [task ':app:preBuild', task ':app:preDebugBuild', task ':app:processDebugNavigationResources']
+Tasks that were excluded: []
+Resolve mutations for :app:preBuild (Thread[#69,Execution worker Thread 2,5,main]) started.
+:app:preBuild (Thread[#69,Execution worker Thread 2,5,main]) started.
+
+> Task :app:preBuild UP-TO-DATE
+Skipping task ':app:preBuild' as it has no actions.
+Resolve mutations for :app:preDebugBuild (Thread[#69,Execution worker Thread 2,5,main]) started.
+:app:preDebugBuild (Thread[#69,Execution worker Thread 2,5,main]) started.
+
+> Task :app:preDebugBuild UP-TO-DATE
+Skipping task ':app:preDebugBuild' as it has no actions.
+Resolve mutations for :app:processDebugNavigationResources (Thread[#69,Execution worker Thread 2,5,main]) started.
+:app:processDebugNavigationResources (Thread[#69,Execution worker Thread 2,5,main]) started.
+
+> Task :app:processDebugNavigationResources
+Downloading https://dl.google.com/dl/android/maven2/androidx/media3/media3-session/1.5.1/media3-session-1.5.1.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download15724131806703153427bin
+Downloading https://dl.google.com/dl/android/maven2/androidx/media/media/1.7.0/media-1.7.0.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download6465916803753998930bin
+Downloading https://dl.google.com/dl/android/maven2/androidx/media3/media3-exoplayer/1.5.1/media3-exoplayer-1.5.1.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download3655151529953945548bin
+Downloading https://dl.google.com/dl/android/maven2/androidx/palette/palette-ktx/1.0.0/palette-ktx-1.0.0.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download7053793170124052976bin
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.palette\palette-ktx\1.0.0\fbc21af9a551489e4405d69a3b278bd73881d1d7\palette-ktx-1.0.0.aar because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\c07378daa208624594dd85ff0ee52efa\workspace\transformed\palette-ktx-1.0.0 because:
+  Caching not enabled.
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.media3\media3-session\1.5.1\d90b15df9a45d9306beedee6fb95eb7e7aef15cf\media3-session-1.5.1.aar because:
+  Caching not enabled.
+Downloading https://dl.google.com/dl/android/maven2/androidx/autofill/autofill/1.0.0/autofill-1.0.0.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download8738030209740928187bin
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.autofill\autofill\1.0.0\d95a6e3b895ad8f037dd01d88c87138b6d5eb507\autofill-1.0.0.aar because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\c1eab1d20e788f717028cbefd69406c6\workspace\transformed\autofill-1.0.0 because:
+  Caching not enabled.
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.media\media\1.7.0\36fc8f204b2e3aa1b2355d4d0f43ef42cb6d2c82\media-1.7.0.aar because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\e8720da741a6ebd7835f645841a43ec3\workspace\transformed\media-1.7.0 because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\6b0c5abbae89683f13d5ff05091668f9\workspace\transformed\media3-session-1.5.1 because:
+  Caching not enabled.
+Downloading https://dl.google.com/dl/android/maven2/androidx/loader/loader/1.0.0/loader-1.0.0.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download12321270829772722016bin
+Downloading https://dl.google.com/dl/android/maven2/androidx/appcompat/appcompat-resources/1.6.1/appcompat-resources-1.6.1.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download12908568685279539056bin
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.loader\loader\1.0.0\8af8b6cec0da85c207d03e15840e0722cbc71e70\loader-1.0.0.aar because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\5966022ef6b0125c51955f4215a65760\workspace\transformed\loader-1.0.0 because:
+  Caching not enabled.
+Downloading https://dl.google.com/dl/android/maven2/androidx/graphics/graphics-path/1.0.1/graphics-path-1.0.1.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download10458998726068197006bin
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.appcompat\appcompat-resources\1.6.1\3fe43025e50b556f319b1ff82a730d5a376a31e\appcompat-resources-1.6.1.aar because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\8ba6ad4c412ec4e814a0d88e03e63d49\workspace\transformed\appcompat-resources-1.6.1 because:
+  Caching not enabled.
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.graphics\graphics-path\1.0.1\7e243033abd313c7202428422a01d48691378e33\graphics-path-1.0.1.aar because:
+  Caching not enabled.
+Caching disabled for ExtractNavigationXmlTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\9.3.1\transforms\7cdae848e085ed9b379d997232c8879b\workspace\transformed\graphics-path-1.0.1 because:
+  Caching not enabled.
+Caching disabled for ExtractAarTransform: C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\caches\modules-2\files-2.1\androidx.media3\media3-exoplayer\1.5.1\696cb34c560e3bef5c374d598b984e19ef465c5\media3-exoplayer-1.5.1.aar because:
+  Caching not enabled.
+Downloading https://dl.google.com/dl/android/maven2/androidx/vectordrawable/vectordrawable-animated/1.1.0/vectordrawable-animated-1.1.0.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download3127920579261912864bin
+Downloading https://dl.google.com/dl/android/maven2/androidx/vectordrawable/vectordrawable/1.1.0/vectordrawable-1.1.0.aar to C:\Users\Sasuu\AppData\Local\Temp\cursor-sandbox-cache\c508048d6853d59af9dd6e50b44e2b2c\gradle\.tmp\gradle_download8282114653959376504bin

@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,11 +121,20 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private var artworkJob: Job? = null
 
     /** Smoothed visualizer target for reactive but stable bars. */
+    @Volatile
     private var visualizerTarget = List(24) { 0.1f }
 
     private val shuffleHistory = ArrayDeque<Int>()
     private var libraryFallback: () -> List<AudioTrackEntity> = { emptyList() }
     var onTrackStarted: ((AudioTrackEntity) -> Unit)? = null
+    /** Fired when session-worthy state changes (track, queue, play/pause, seek, shuffle/repeat). */
+    var onSessionChanged: (() -> Unit)? = null
+
+    private var lastEnsureServiceAt = 0L
+    private var lastNotificationKey: String? = null
+    private var lastNotificationAt = 0L
+    /** Suppress session-change callbacks while a restore is in flight. */
+    private var restoringSession = false
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -136,8 +146,8 @@ class PlayerEngine private constructor(private val appContext: Context) {
                         _playbackDuration.value = dur
                     }
                     attachAudioEffects(player.audioSessionId)
-                    // If UI came back while we still intend to play, keep going
-                    if (userWantsPlaying && !player.isPlaying) {
+                    // Resume only when the user still wants play and we are not paused for a call/focus loss
+                    if (userWantsPlaying && !pausedByTransientFocusLoss && !player.isPlaying && hasAudioFocus) {
                         player.playWhenReady = true
                         player.play()
                     }
@@ -155,8 +165,8 @@ class PlayerEngine private constructor(private val appContext: Context) {
             if (isPlaying) {
                 pausedByTransientFocusLoss = false
                 ensureServiceRunning()
-            } else if (userWantsPlaying) {
-                // Brief OEM/focus blip while returning to the app — schedule a resume
+            } else if (userWantsPlaying && !pausedByTransientFocusLoss) {
+                // Brief OEM blip while returning to the app — schedule a resume
                 schedulePlaybackReassert()
             }
             updateSessionState()
@@ -172,6 +182,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private var reassertJob: Job? = null
 
     private fun schedulePlaybackReassert() {
+        if (pausedByTransientFocusLoss || !userWantsPlaying) return
         reassertJob?.cancel()
         reassertJob = scope.launch {
             delay(250)
@@ -184,11 +195,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
      * cannot leave the player paused while the user still expects music.
      */
     fun reassertPlaybackIfNeeded() {
-        if (!userWantsPlaying) return
+        if (!userWantsPlaying || pausedByTransientFocusLoss) return
         val track = _currentTrack.value ?: return
+        if (!requestPlaybackFocus()) return
         if (track.uri == AudioRepository.SYNTH_URI) {
             if (!_isPlaying.value) {
-                requestPlaybackFocus()
                 synth.start()
                 applySynthControls()
                 _isPlaying.value = true
@@ -200,7 +211,6 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
         val player = exoPlayer ?: return
         if (!player.isPlaying) {
-            requestPlaybackFocus()
             player.playWhenReady = true
             try {
                 player.play()
@@ -217,10 +227,12 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
-                // Pause for now; keep user intent so reopening the app can resume
-                pausedByTransientFocusLoss = true
+                // Another app took audio permanently — stop fighting it
+                userWantsPlaying = false
+                pausedByTransientFocusLoss = false
                 restoreDuckedVolume()
-                if (_isPlaying.value) pauseForFocusLoss(transient = true)
+                if (_isPlaying.value) pauseForFocusLoss(transient = false)
+                abandonPlaybackFocus()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 restoreDuckedVolume()
@@ -233,6 +245,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
+                hasAudioFocus = true
                 restoreDuckedVolume()
                 if (userWantsPlaying) {
                     pausedByTransientFocusLoss = false
@@ -244,7 +257,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     private fun pauseForFocusLoss(transient: Boolean) {
         pausedByTransientFocusLoss = transient
-        // Keep userWantsPlaying as-is for transient (call); cleared for permanent above
+        // Keep userWantsPlaying as-is for transient (call); cleared for permanent by caller
         val track = _currentTrack.value ?: return
         _isPlaying.value = false
         if (track.uri == AudioRepository.SYNTH_URI) {
@@ -384,9 +397,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 togglePlayPause(forcePause = true)
                 _currentTrack.value = null
                 updateSessionState()
+                notifySessionChanged()
             }
         } else {
             updateSessionState()
+            notifySessionChanged()
         }
     }
 
@@ -419,9 +434,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 togglePlayPause(forcePause = true)
                 _currentTrack.value = null
                 updateSessionState()
+                notifySessionChanged()
             }
         } else {
             updateSessionState()
+            notifySessionChanged()
         }
     }
 
@@ -444,6 +461,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
         queue.add(currentIndex + 1, track)
         _activeQueue.value = queue
         updateSessionState()
+        notifySessionChanged()
     }
 
     fun playTrack(track: AudioTrackEntity, customQueue: List<AudioTrackEntity>? = null) {
@@ -466,28 +484,35 @@ class PlayerEngine private constructor(private val appContext: Context) {
         stopEngine(keepSession = true)
         _currentTrack.value = track
         userWantsPlaying = true
-        _isPlaying.value = true
         _playbackPosition.value = 0L
         pausedByTransientFocusLoss = false
         mediaSession?.isActive = true
-        requestPlaybackFocus()
+        val focusGranted = requestPlaybackFocus()
+        _isPlaying.value = focusGranted
 
         if (track.uri == AudioRepository.SYNTH_URI) {
             _playbackDuration.value = track.durationMs
             applyVolumeToEngines()
             applySynthControls()
-            synth.start()
-            startProgressTracker(isSynth = true)
+            if (focusGranted) {
+                synth.start()
+                startProgressTracker(isSynth = true)
+            }
         } else {
             try {
                 val player = ensureExoPlayer()
                 player.setMediaItem(MediaItem.fromUri(Uri.parse(track.uri)))
                 player.repeatMode = Player.REPEAT_MODE_OFF
                 player.prepare()
-                player.playWhenReady = true
-                applyPlaybackSpeedToEngines()
-                applyVolumeToEngines()
-                startProgressTracker(isSynth = false)
+                player.playWhenReady = focusGranted
+                if (focusGranted) {
+                    applyPlaybackSpeedToEngines()
+                    applyVolumeToEngines()
+                    startProgressTracker(isSynth = false)
+                } else {
+                    applyPlaybackSpeedToEngines()
+                    applyVolumeToEngines()
+                }
             } catch (e: Exception) {
                 Log.e(tag, "Failed to start ExoPlayer", e)
                 _isPlaying.value = false
@@ -499,6 +524,105 @@ class PlayerEngine private constructor(private val appContext: Context) {
         updateSessionState()
         ensureServiceRunning()
         onTrackStarted?.invoke(track)
+        notifySessionChanged()
+    }
+
+    /**
+     * Restores a previously saved session: same track, queue, artwork metadata,
+     * seek position, and play/pause intent — without bumping play count.
+     */
+    fun restoreSession(
+        track: AudioTrackEntity,
+        queue: List<AudioTrackEntity>,
+        positionMs: Long,
+        resumePlayback: Boolean,
+        shuffleEnabled: Boolean = _isShuffleEnabled.value,
+        repeatMode: RepeatMode = _repeatMode.value
+    ) {
+        restoringSession = true
+        try {
+            val restoredQueue = queue.ifEmpty { listOf(track) }
+            _activeQueue.value = restoredQueue
+            shuffleHistory.clear()
+            _isShuffleEnabled.value = shuffleEnabled
+            _repeatMode.value = repeatMode
+
+            stopEngine(keepSession = true)
+            _currentTrack.value = track
+            val clampedPos = positionMs.coerceAtLeast(0L)
+            _playbackPosition.value = clampedPos
+            _playbackDuration.value = track.durationMs.coerceAtLeast(0L)
+            pausedByTransientFocusLoss = false
+            mediaSession?.isActive = true
+
+            userWantsPlaying = resumePlayback
+            val focusGranted = if (resumePlayback) requestPlaybackFocus() else false
+            val shouldPlay = resumePlayback && focusGranted
+            _isPlaying.value = shouldPlay
+
+            if (track.uri == AudioRepository.SYNTH_URI) {
+                applyVolumeToEngines()
+                applySynthControls()
+                synth.seekToMs(clampedPos)
+                if (shouldPlay) {
+                    synth.start()
+                    startProgressTracker(isSynth = true)
+                } else {
+                    synth.pause()
+                }
+            } else {
+                try {
+                    val player = ensureExoPlayer()
+                    player.setMediaItem(MediaItem.fromUri(Uri.parse(track.uri)))
+                    player.repeatMode = Player.REPEAT_MODE_OFF
+                    player.prepare()
+                    player.seekTo(clampedPos)
+                    player.playWhenReady = shouldPlay
+                    applyPlaybackSpeedToEngines()
+                    applyVolumeToEngines()
+                    if (shouldPlay) {
+                        startProgressTracker(isSynth = false)
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed to restore ExoPlayer session", e)
+                    _isPlaying.value = false
+                    userWantsPlaying = false
+                }
+            }
+
+            updateSessionMetadata(track)
+            updateSessionState()
+            if (shouldPlay) {
+                ensureServiceRunning()
+            }
+            // Paused restore: UI shows the track from StateFlows; no FGS/notification needed
+        } finally {
+            restoringSession = false
+        }
+        notifySessionChanged()
+    }
+
+    /** Snapshot suitable for [PlaybackSessionStore]; null when nothing is loaded. */
+    fun captureSession(): PlaybackSession? {
+        val track = _currentTrack.value ?: return null
+        val queue = _activeQueue.value
+        return PlaybackSession(
+            trackUri = track.uri,
+            queueUris = if (queue.isNotEmpty()) queue.map { it.uri } else listOf(track.uri),
+            positionMs = _playbackPosition.value.coerceAtLeast(0L),
+            wasPlaying = userWantsPlaying || _isPlaying.value,
+            shuffleEnabled = _isShuffleEnabled.value,
+            repeatMode = _repeatMode.value
+        )
+    }
+
+    private fun notifySessionChanged() {
+        if (restoringSession) return
+        try {
+            onSessionChanged?.invoke()
+        } catch (e: Exception) {
+            Log.w(tag, "onSessionChanged failed", e)
+        }
     }
 
     fun togglePlayPause(forcePlay: Boolean = false, forcePause: Boolean = false) {
@@ -523,7 +647,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
         } else {
             userWantsPlaying = true
             pausedByTransientFocusLoss = false
-            requestPlaybackFocus()
+            if (!requestPlaybackFocus()) {
+                _isPlaying.value = false
+                updateSessionState()
+                return
+            }
             _isPlaying.value = true
             mediaSession?.isActive = true
             if (track.uri == AudioRepository.SYNTH_URI) {
@@ -538,6 +666,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
             ensureServiceRunning()
         }
         updateSessionState()
+        notifySessionChanged()
     }
 
     fun nextTrack(fromUser: Boolean = true) {
@@ -644,12 +773,14 @@ class PlayerEngine private constructor(private val appContext: Context) {
             _playbackPosition.value = clamped
         }
         updateSessionState()
+        notifySessionChanged()
     }
 
     fun toggleShuffle() {
         _isShuffleEnabled.value = !_isShuffleEnabled.value
         if (!_isShuffleEnabled.value) shuffleHistory.clear()
         updateSessionState()
+        notifySessionChanged()
     }
 
     fun toggleLoop() {
@@ -659,6 +790,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
             RepeatMode.ONE -> RepeatMode.OFF
         }
         updateSessionState()
+        notifySessionChanged()
     }
 
     fun updateSynthCutoff(cutoff: Float) {
@@ -744,16 +876,53 @@ class PlayerEngine private constructor(private val appContext: Context) {
         _currentTrack.value?.let { updateSessionMetadata(it) }
     }
 
+    /**
+     * Fully stops playback and releases ExoPlayer, synth, audio focus, effects,
+     * and the media session. Clears the singleton so the next [get] creates a fresh engine.
+     */
     fun release() {
+        userWantsPlaying = false
+        pausedByTransientFocusLoss = false
+        volumeBeforeDuck = null
         sleepTimerJob?.cancel()
         progressJob?.cancel()
         visualizerJob?.cancel()
+        artworkJob?.cancel()
+        reassertJob?.cancel()
+        sleepTimerJob = null
+        progressJob = null
+        visualizerJob = null
+        artworkJob = null
+        reassertJob = null
         stopEngine(keepSession = false)
-        mediaSession?.release()
+        abandonPlaybackFocus()
+        try {
+            mediaSession?.isActive = false
+            mediaSession?.setCallback(null)
+            mediaSession?.release()
+        } catch (e: Exception) {
+            Log.w(tag, "MediaSession release failed", e)
+        }
         mediaSession = null
         exoPlayer?.removeListener(playerListener)
-        exoPlayer?.release()
+        try {
+            exoPlayer?.release()
+        } catch (e: Exception) {
+            Log.w(tag, "ExoPlayer release failed", e)
+        }
         exoPlayer = null
+        onTrackStarted = null
+        onSessionChanged = null
+        _activeQueue.value = emptyList()
+        _playbackPosition.value = 0L
+        _playbackDuration.value = 0L
+        _sleepTimerRemainingMs.value = 0L
+        _waveformAmplitudes.value = List(24) { 0.1f }
+        try {
+            scope.cancel()
+        } catch (_: Exception) {
+        }
+        clearInstance(this)
     }
 
     private fun pickShuffleIndex(size: Int, avoid: Int): Int {
@@ -906,7 +1075,8 @@ class PlayerEngine private constructor(private val appContext: Context) {
                         }
                     }
                 }
-                updateSessionState()
+                // Position-only MediaSession update — avoid rebuilding the notification every tick
+                updateSessionPlaybackState(notify = false)
                 delay(500)
             }
         }
@@ -916,8 +1086,19 @@ class PlayerEngine private constructor(private val appContext: Context) {
         visualizerJob?.cancel()
         visualizerJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
+                val playing = _isPlaying.value
+                val hasTrack = _currentTrack.value != null
+                if (!playing && !hasTrack) {
+                    // Idle — sleep hard to save CPU/battery
+                    if (_waveformAmplitudes.value.any { it > 0.09f }) {
+                        _waveformAmplitudes.value = List(24) { 0.08f }
+                    }
+                    delay(250)
+                    continue
+                }
+
                 val track = _currentTrack.value
-                if (_isPlaying.value && track?.uri == AudioRepository.SYNTH_URI) {
+                if (playing && track?.uri == AudioRepository.SYNTH_URI) {
                     val rootAmp = (synth.lastWaveformValue + 1.0f) / 2.0f
                     val t = System.currentTimeMillis() * 0.012
                     visualizerTarget = List(24) { index ->
@@ -926,20 +1107,21 @@ class PlayerEngine private constructor(private val appContext: Context) {
                         val harmonic = kotlin.math.sin(phase * 2.0 + t * 1.4).toFloat() * 0.15f
                         ((rootAmp * 0.7f) + (modulation * 0.22f) + harmonic + 0.08f).coerceIn(0.08f, 1f)
                     }
-                } else if (!_isPlaying.value) {
+                } else if (!playing) {
                     visualizerTarget = visualizerTarget.map { (it * 0.82f).coerceAtLeast(0.08f) }
                 }
 
                 // Smooth interpolation toward target for reactive, performant bars
                 val current = _waveformAmplitudes.value
+                val targetSnapshot = visualizerTarget
                 val smoothed = List(24) { i ->
-                    val target = visualizerTarget.getOrElse(i) { 0.1f }
+                    val target = targetSnapshot.getOrElse(i) { 0.1f }
                     val prev = current.getOrElse(i) { 0.1f }
                     val alpha = if (target >= prev) 0.55f else 0.28f
                     (prev + (target - prev) * alpha).coerceIn(0.08f, 1f)
                 }
                 _waveformAmplitudes.value = smoothed
-                delay(33)
+                delay(if (playing) 33L else 120L)
             }
         }
     }
@@ -971,7 +1153,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     withArt.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, art)
                 }
                 mediaSession?.setMetadata(withArt.build())
-                PlaybackService.updateNotification(appContext)
+                maybeUpdateNotification(force = true)
             }
         }
     }
@@ -1001,6 +1183,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     private fun updateSessionState() {
+        updateSessionPlaybackState(notify = true)
+    }
+
+    private fun updateSessionPlaybackState(notify: Boolean) {
         val state = if (_isPlaying.value) {
             PlaybackStateCompat.STATE_PLAYING
         } else if (_currentTrack.value != null) {
@@ -1028,10 +1214,25 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 )
                 .build()
         )
+        if (notify) {
+            maybeUpdateNotification(force = true)
+        }
+    }
+
+    private fun maybeUpdateNotification(force: Boolean = false) {
+        val track = _currentTrack.value
+        val key = "${track?.id}|${_isPlaying.value}"
+        val now = SystemClock.elapsedRealtime()
+        if (!force && key == lastNotificationKey && now - lastNotificationAt < 2_000L) {
+            return
+        }
+        lastNotificationKey = key
+        lastNotificationAt = now
         PlaybackService.updateNotification(appContext)
     }
 
-    private fun requestPlaybackFocus() {
+    /** @return true when audio focus was granted immediately. */
+    private fun requestPlaybackFocus(): Boolean {
         val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
@@ -1056,6 +1257,8 @@ class PlayerEngine private constructor(private val appContext: Context) {
             )
         }
         hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        // Keep user intent when focus is delayed — AUDIOFOCUS_GAIN will resume
+        return hasAudioFocus
     }
 
     private fun abandonPlaybackFocus() {
@@ -1070,6 +1273,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     private fun ensureServiceRunning() {
+        if (_currentTrack.value == null) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastEnsureServiceAt < 1_500L) return
+        lastEnsureServiceAt = now
         try {
             val intent = Intent(appContext, PlaybackService::class.java).apply {
                 action = PlaybackService.ACTION_ENSURE_FOREGROUND
@@ -1082,7 +1289,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
         } catch (e: Exception) {
             // Background start can fail on some OEMs; notification update still helps if service lives
             Log.w(tag, "Could not start PlaybackService", e)
-            PlaybackService.updateNotification(appContext)
+            maybeUpdateNotification(force = true)
         }
     }
 
@@ -1100,6 +1307,14 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 INSTANCE = engine
                 engine.initMediaSession()
                 engine
+            }
+        }
+
+        private fun clearInstance(engine: PlayerEngine) {
+            synchronized(this) {
+                if (INSTANCE === engine) {
+                    INSTANCE = null
+                }
             }
         }
     }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Foreground media service that keeps playback alive in the background and
@@ -35,12 +36,6 @@ class PlaybackService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        val engine = PlayerEngine.get(this)
-        promoteToForeground(engine)
-        observeJob = scope.launch {
-            launch { engine.currentTrack.collectLatest { refresh() } }
-            launch { engine.isPlaying.collectLatest { refresh() } }
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -52,8 +47,9 @@ class PlaybackService : Service() {
             ACTION_NEXT -> engine.nextTrack()
             ACTION_PREV -> engine.previousTrack()
             ACTION_STOP -> {
+                persistEngineSession(paused = true)
                 engine.togglePlayPause(forcePause = true)
-                stopForeground(STOP_FOREGROUND_REMOVE)
+                tearDownForeground()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -74,7 +70,22 @@ class PlaybackService : Service() {
             }
         }
 
-        // Always re-assert foreground status — critical when the app is minimized
+        // Sticky restart / ensure with nothing to play — do not linger as an empty FGS
+        if (engine.currentTrack.value == null) {
+            tearDownForeground()
+            // Avoid leaving an idle engine (visualizer loop) after sticky restart
+            if (intent?.action == null || intent.action == ACTION_ENSURE_FOREGROUND) {
+                try {
+                    PlayerEngine.getOrNull()?.release()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Idle engine release failed", e)
+                }
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        ensureObserving(engine)
         promoteToForeground(engine)
         return START_STICKY
     }
@@ -82,18 +93,62 @@ class PlaybackService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // App swiped away from recents — keep playing if a track is active
-        val engine = PlayerEngine.getOrNull()
-        if (engine?.isPlaying?.value == true || engine?.currentTrack?.value != null) {
-            promoteToForeground(engine)
+        // App swiped away from Recents — persist session, then stop playback and tear down
+        Log.i(TAG, "Task removed — saving session, stopping playback and releasing media resources")
+        observeJob?.cancel()
+        observeJob = null
+        try {
+            persistEngineSession(paused = true)
+            PlayerEngine.getOrNull()?.release()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release PlayerEngine on task removed", e)
         }
+        tearDownForeground()
+        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
         observeJob?.cancel()
+        observeJob = null
         scope.cancel()
         super.onDestroy()
+    }
+
+    /** Writes the current engine snapshot before teardown so restore survives app exit / reboot. */
+    private fun persistEngineSession(paused: Boolean) {
+        val engine = PlayerEngine.getOrNull() ?: return
+        val snapshot = engine.captureSession() ?: return
+        val toSave = if (paused) snapshot.copy(wasPlaying = false) else snapshot
+        try {
+            runBlocking {
+                PlaybackSessionStore(applicationContext).saveSession(toSave)
+            }
+            Log.i(TAG, "Persisted playback session for ${toSave.trackUri}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to persist playback session", e)
+        }
+    }
+
+    private fun ensureObserving(engine: PlayerEngine) {
+        if (observeJob?.isActive == true) return
+        observeJob = scope.launch {
+            launch { engine.currentTrack.collectLatest { refresh() } }
+            launch { engine.isPlaying.collectLatest { refresh() } }
+        }
+    }
+
+    private fun tearDownForeground() {
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (e: Exception) {
+            Log.w(TAG, "stopForeground failed", e)
+        }
+        try {
+            getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+        } catch (e: Exception) {
+            Log.w(TAG, "Notification cancel failed", e)
+        }
     }
 
     private fun promoteToForeground(engine: PlayerEngine) {

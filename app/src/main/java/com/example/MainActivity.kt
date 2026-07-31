@@ -29,14 +29,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Recover if a focus/lifecycle blip paused playback while returning to the app
+        // Single reassert when returning — recovers OEM/focus blips without triple-firing
         viewModel.reassertPlaybackIfNeeded()
+    }
+
+    override fun onStop() {
+        // Flush position / pause state before process may be killed
+        viewModel.persistPlaybackSession()
+        super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.onAppForegrounded()
-        // Second chance after the activity is fully interactive
-        viewModel.reassertPlaybackIfNeeded()
     }
 }

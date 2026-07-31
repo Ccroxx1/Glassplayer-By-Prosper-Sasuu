@@ -29,6 +29,9 @@ interface AudioDao {
     @Query("SELECT * FROM audio_tracks WHERE uri = :uri LIMIT 1")
     suspend fun getTrackByUri(uri: String): AudioTrackEntity?
 
+    @Query("SELECT * FROM audio_tracks WHERE uri IN (:uris)")
+    suspend fun getTracksByUris(uris: List<String>): List<AudioTrackEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTrack(track: AudioTrackEntity): Long
 
@@ -45,7 +48,9 @@ interface AudioDao {
             folderName = :folderName,
             albumArtUri = :albumArtUri,
             category = :category,
-            dateAdded = CASE WHEN :dateAdded > 0 THEN :dateAdded ELSE dateAdded END
+            dateAdded = CASE WHEN :dateAdded > 0 THEN :dateAdded ELSE dateAdded END,
+            dateModified = CASE WHEN :dateModified > 0 THEN :dateModified ELSE dateModified END,
+            year = CASE WHEN :year > 0 THEN :year ELSE year END
         WHERE uri = :uri
         """
     )
@@ -58,7 +63,9 @@ interface AudioDao {
         folderName: String,
         albumArtUri: String?,
         category: String,
-        dateAdded: Long
+        dateAdded: Long,
+        dateModified: Long,
+        year: Int
     )
 
     @Query(

@@ -34,7 +34,8 @@ class AudioViewModel(
     private val context: Context,
     private val repository: AudioRepository,
     private val engine: PlayerEngine,
-    private val blacklistStore: BlacklistStore
+    private val blacklistStore: BlacklistStore,
+    private val sessionStore: PlaybackSessionStore
 ) : ViewModel() {
 
     private val tag = "AudioViewModel"
@@ -42,6 +43,8 @@ class AudioViewModel(
     private var rescanJob: Job? = null
     @Volatile private var pendingRescan = false
     @Volatile private var libraryWatching = false
+    @Volatile private var sessionRestored = false
+    private var positionPersistJob: Job? = null
 
     val blacklistedFolders: StateFlow<Set<String>> = blacklistStore.blacklistedFolders
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
@@ -109,10 +112,21 @@ class AudioViewModel(
                 repository.incrementPlayCount(track.id, System.currentTimeMillis())
             }
         }
+        engine.onSessionChanged = {
+            persistPlaybackSession()
+        }
         viewModelScope.launch {
             try {
                 repository.deleteNonDeviceTracks()
-                repository.ensureSynthTrack()
+                // Drop built-in Neon Pulse so it never reappears in the library
+                if (engine.currentTrack.value?.uri == AudioRepository.SYNTH_URI) {
+                    engine.togglePlayPause(forcePause = true)
+                }
+                repository.removeSynthTrack()
+                // Restore as soon as Room is ready (Flow may lag until collectors attach)
+                if (!sessionRestored && engine.currentTrack.value == null) {
+                    restorePlaybackSession(emptyList())
+                }
             } catch (e: Exception) {
                 Log.e(tag, "Init library failed", e)
             }
@@ -122,6 +136,128 @@ class AudioViewModel(
             blacklistedFolders.collect { blocked ->
                 engine.pruneQueueForBlacklist(blocked)
             }
+        }
+        // Restore last session once the library has enough data to resolve tracks
+        viewModelScope.launch {
+            allTracks.collect { tracks ->
+                if (!sessionRestored && tracks.isNotEmpty()) {
+                    restorePlaybackSession(tracks)
+                }
+            }
+        }
+        // Throttled position persistence while a track is loaded
+        viewModelScope.launch {
+            engine.playbackPosition.collect {
+                if (engine.currentTrack.value == null) return@collect
+                positionPersistJob?.cancel()
+                positionPersistJob = viewModelScope.launch {
+                    delay(2_000L)
+                    persistPlaybackSession()
+                }
+            }
+        }
+    }
+
+    /** Flush the current engine session to disk (safe to call from Activity lifecycle). */
+    fun persistPlaybackSession() {
+        viewModelScope.launch {
+            persistPlaybackSessionNow()
+        }
+    }
+
+    private suspend fun persistPlaybackSessionNow() {
+        try {
+            val snapshot = engine.captureSession()
+            if (snapshot == null) {
+                // Only clear after we have successfully restored once — avoid wiping
+                // a saved session during the brief window before restore runs.
+                if (sessionRestored) {
+                    sessionStore.clearSession()
+                }
+                return
+            }
+            sessionStore.saveSession(snapshot)
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to persist playback session", e)
+        }
+    }
+
+    private suspend fun restorePlaybackSession(library: List<AudioTrackEntity>) {
+        if (sessionRestored) return
+        // Process still has an active engine session (e.g. FGS survived) — keep it
+        if (engine.currentTrack.value != null) {
+            sessionRestored = true
+            return
+        }
+        val saved = try {
+            sessionStore.loadSession()
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to load playback session", e)
+            sessionRestored = true
+            return
+        }
+        if (saved == null) {
+            sessionRestored = true
+            return
+        }
+
+        val byUri = library.associateBy { it.uri }
+        // Room is authoritative across cold start; allTracks may still be catching up
+        var track = repository.getTrackByUri(saved.trackUri) ?: byUri[saved.trackUri]
+        if (track == null) {
+            // Track permanently gone from the library database
+            Log.i(tag, "Saved track no longer in library; clearing session")
+            sessionStore.clearSession()
+            sessionRestored = true
+            return
+        }
+        // Prefer freshest library entity (artwork + tags) when available
+        track = byUri[track.uri] ?: track
+
+        val queueUris = saved.queueUris.ifEmpty { listOf(saved.trackUri) }
+        var queue = repository.getTracksByUrisOrdered(queueUris)
+        if (queue.isEmpty()) {
+            queue = queueUris.mapNotNull { byUri[it] }
+        }
+        // Overlay fresher library copies when present
+        if (byUri.isNotEmpty()) {
+            queue = queue.map { byUri[it.uri] ?: it }
+        }
+        if (queue.none { it.uri == track.uri }) {
+            queue = listOf(track) + queue
+        }
+
+        val blocked = blacklistedFolders.value
+        fun allowed(t: AudioTrackEntity) =
+            t.uri == AudioRepository.SYNTH_URI || t.folderName !in blocked
+        queue = queue.filter(::allowed)
+        if (!allowed(track)) {
+            sessionStore.clearSession()
+            sessionRestored = true
+            return
+        }
+        if (queue.isEmpty()) queue = listOf(track)
+
+        try {
+            // After pause + exit, wasPlaying is false — restore paused at saved position.
+            // Artwork comes back with the entity's albumArtUri for Coil / MediaSession.
+            engine.restoreSession(
+                track = track,
+                queue = queue,
+                positionMs = saved.positionMs,
+                resumePlayback = saved.wasPlaying,
+                shuffleEnabled = saved.shuffleEnabled,
+                repeatMode = saved.repeatMode
+            )
+            Log.i(
+                tag,
+                "Restored session: ${track.title} @ ${saved.positionMs}ms " +
+                    "(playing=${saved.wasPlaying}, queue=${queue.size})"
+            )
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to restore playback session", e)
+        } finally {
+            sessionRestored = true
         }
     }
 
@@ -260,8 +396,6 @@ class AudioViewModel(
     }
 
     fun onAppForegrounded() {
-        // Always try to keep music going when returning — even before permission checks
-        engine.reassertPlaybackIfNeeded()
         if (!hasAudioPermission()) return
         startWatchingLibrary()
         // Don't hammer MediaStore on every resume while music is playing
@@ -310,7 +444,9 @@ class AudioViewModel(
                         MediaStore.Audio.Media.DATA,
                         MediaStore.Audio.Media.ALBUM,
                         MediaStore.Audio.Media.ALBUM_ID,
-                        MediaStore.Audio.Media.DATE_ADDED
+                        MediaStore.Audio.Media.DATE_ADDED,
+                        MediaStore.Audio.Media.DATE_MODIFIED,
+                        MediaStore.Audio.Media.YEAR
                     )
 
                     val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
@@ -340,7 +476,10 @@ class AudioViewModel(
                         val albumColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
                         val albumIdColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
                         val dateAddedColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+                        val dateModifiedColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
+                        val yearColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
 
+                        val scanned = ArrayList<AudioTrackEntity>(c.count.coerceAtLeast(0))
                         while (c.moveToNext()) {
                             val id = c.getLong(idColumn)
                             val title = c.getString(titleColumn) ?: "Unknown Track"
@@ -350,6 +489,8 @@ class AudioViewModel(
                             val albumName = c.getString(albumColumn) ?: "Unknown Album"
                             val albumId = c.getLong(albumIdColumn)
                             val dateAddedSec = c.getLong(dateAddedColumn)
+                            val dateModifiedSec = c.getLong(dateModifiedColumn)
+                            val year = c.getInt(yearColumn)
                             val contentUri = ContentUris.withAppendedId(
                                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                                 id
@@ -370,13 +511,15 @@ class AudioViewModel(
                                 "Music"
                             }
 
-                            repository.insertTrack(
+                            scanned.add(
                                 AudioTrackEntity(
                                     uri = contentUri,
                                     title = title,
                                     artist = artist,
                                     durationMs = duration,
                                     dateAdded = dateAddedSec * 1000L,
+                                    dateModified = dateModifiedSec * 1000L,
+                                    year = year,
                                     category = "My Device",
                                     album = albumName,
                                     folderName = folderName,
@@ -384,8 +527,9 @@ class AudioViewModel(
                                 )
                             )
                         }
+                        repository.insertTracks(scanned)
                     }
-                    repository.ensureSynthTrack()
+                    repository.removeSynthTrack()
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Scan failed", e)
@@ -473,6 +617,9 @@ class AudioViewModel(
 
     override fun onCleared() {
         stopWatchingLibrary()
+        engine.onSessionChanged = null
+        // Best-effort flush; ViewModelScope is cancelling so use a blocking-friendly path
+        // via the shared engine snapshot — PlaybackService also saves on task removed.
         super.onCleared()
     }
 }
@@ -481,11 +628,18 @@ class AudioViewModelFactory(private val context: Context) : ViewModelProvider.Fa
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AudioViewModel::class.java)) {
             val database = AudioDatabase.getDatabase(context)
-            val repository = AudioRepository(database.audioDao())
+            val repository = AudioRepository(database.audioDao(), database)
             val engine = PlayerEngine.get(context.applicationContext)
             val blacklistStore = BlacklistStore(context.applicationContext)
+            val sessionStore = PlaybackSessionStore(context.applicationContext)
             @Suppress("UNCHECKED_CAST")
-            return AudioViewModel(context.applicationContext, repository, engine, blacklistStore) as T
+            return AudioViewModel(
+                context.applicationContext,
+                repository,
+                engine,
+                blacklistStore,
+                sessionStore
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

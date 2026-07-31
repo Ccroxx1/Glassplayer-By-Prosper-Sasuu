@@ -18,6 +18,8 @@ data class AudioTrackEntity(
     val playCount: Int = 0,
     val lastPlayed: Long = 0,
     val dateAdded: Long = 0,
+    val dateModified: Long = 0,
+    val year: Int = 0,
     val category: String = "Library",
     val album: String = "Glassmorphic Dreams",
     val folderName: String = "Default",
