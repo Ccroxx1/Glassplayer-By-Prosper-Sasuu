@@ -46,6 +46,23 @@ Glassmorphic local music player for Android (Jetpack Compose).
 | `GlassPalette` | Album-art → glass accent colors via Palette API |
 | Room (`AudioDatabase`) | Tracks, playlists, play counts, `dateAdded` |
 
+## Screenshots
+
+### Home Screen
+<img src="screenshots/Home%20screen.png" width="300">
+
+### Now Playing
+<img src="screenshots/Now%20Playing.png" width="300">
+
+### Playlist
+<img src="screenshots/Playlist.png" width="300">
+
+### Search
+<img src="screenshots/Search.png" width="300">
+
+### Block Folder
+<img src="screenshots/Block%20Folder.png" width="300">
+
 ## Version notes
 
 This release upgrades the original GlassPlayer with Media3 ExoPlayer, smart playlists, expanded search, dynamic theming, vinyl gestures, folder blacklisting, metadata editing, and refined visualizers — while preserving prior queue, EQ, lyrics, synth, and browse features.
