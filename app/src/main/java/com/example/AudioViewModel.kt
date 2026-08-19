@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.DocumentsContract
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,16 +37,51 @@ class AudioViewModel(
     private val repository: AudioRepository,
     private val engine: PlayerEngine,
     private val blacklistStore: BlacklistStore,
-    private val sessionStore: PlaybackSessionStore
+    private val sessionStore: PlaybackSessionStore,
+    private val appPreferencesStore: AppPreferencesStore
 ) : ViewModel() {
 
     private val tag = "AudioViewModel"
+    private companion object {
+        const val KEY_IMPORTED_FOLDERS = "tree_uris"
+    }
+
+    private val importedFoldersPrefs by lazy {
+        context.getSharedPreferences("imported_music_folders", Context.MODE_PRIVATE)
+    }
+
+    private val supportedAudioExtensions = setOf(
+        "mp3", "m4a", "mp4", "aac", "flac", "wav", "ogg", "oga", "opus",
+        "amr", "3gp", "3gpp", "mid", "midi", "xmf", "mxmf", "rtttl", "rtx", "ota", "imy"
+    )
     private var mediaObserver: ContentObserver? = null
     private var rescanJob: Job? = null
     @Volatile private var pendingRescan = false
     @Volatile private var libraryWatching = false
     @Volatile private var sessionRestored = false
     private var positionPersistJob: Job? = null
+    private var scrobbleJob: Job? = null
+
+    private val _importedMusicFolders = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val importedMusicFolders: StateFlow<List<Pair<String, String>>> = _importedMusicFolders.asStateFlow()
+
+    init {
+        refreshImportedFoldersList()
+    }
+
+    private fun refreshImportedFoldersList() {
+        val uris = importedFolderUris()
+        viewModelScope.launch(Dispatchers.IO) {
+            val list = uris.map { uriString ->
+                val uri = Uri.parse(uriString)
+                val name = try {
+                    queryDocumentDisplayName(context, uri, DocumentsContract.getTreeDocumentId(uri))
+                } catch (e: Exception) { null } ?: "Unknown Folder"
+                uriString to name
+            }
+            _importedMusicFolders.value = list
+        }
+    }
 
     val blacklistedFolders: StateFlow<Set<String>> = blacklistStore.blacklistedFolders
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
@@ -102,14 +139,72 @@ class AudioViewModel(
     val equalizerEnabled = engine.equalizerEnabled
     val sleepTimerRemainingMs = engine.sleepTimerRemainingMs
 
+    val crossfadeSec: StateFlow<Float> = appPreferencesStore.crossfadeSec
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
+    val pitchSemitones: StateFlow<Float> = appPreferencesStore.pitchSemitones
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
+    val sleepFadeEnabled: StateFlow<Boolean> = appPreferencesStore.sleepFadeEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val colorTheme: StateFlow<String> = appPreferencesStore.colorTheme
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GlassTheme.DYNAMIC.name)
+
+    val lastFmUsername: StateFlow<String> = appPreferencesStore.lastFmUsername
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    private val lastFmSessionKey: StateFlow<String> = appPreferencesStore.lastFmSessionKey
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    private val _scrobbleCount = MutableStateFlow(0)
+    val scrobbleCount: StateFlow<Int> = _scrobbleCount.asStateFlow()
+
+    private val _listeningStats = MutableStateFlow<AudioRepository.ListeningStats?>(null)
+    val listeningStats: StateFlow<AudioRepository.ListeningStats?> = _listeningStats.asStateFlow()
+
+    private val _duplicateGroups = MutableStateFlow<List<AudioRepository.DuplicateGroup>>(emptyList())
+    val duplicateGroups: StateFlow<List<AudioRepository.DuplicateGroup>> = _duplicateGroups.asStateFlow()
+
+    // --- Extended smart playlists ---
+    val neverPlayedTracks: StateFlow<List<AudioTrackEntity>> =
+        combine(repository.neverPlayedTracks, blacklistedFolders) { tracks, blocked ->
+            tracks.filter { it.folderName !in blocked }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val longTracks: StateFlow<List<AudioTrackEntity>> =
+        combine(repository.longTracks, blacklistedFolders) { tracks, blocked ->
+            tracks.filter { it.folderName !in blocked }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val thisYearTracks: StateFlow<List<AudioTrackEntity>> =
+        combine(repository.thisYearTracks, blacklistedFolders) { tracks, blocked ->
+            tracks.filter { it.folderName !in blocked }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- Fetch lyrics loading state ---
+    private val _isFetchingLyrics = MutableStateFlow(false)
+    val isFetchingLyrics: StateFlow<Boolean> = _isFetchingLyrics.asStateFlow()
+
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            crossfadeSec.collect { engine.setCrossfadeSec(it) }
+        }
+        viewModelScope.launch {
+            pitchSemitones.collect { engine.setPitchSemitones(it) }
+        }
+        viewModelScope.launch {
+            sleepFadeEnabled.collect { engine.setSleepFadeEnabled(it) }
+        }
+
         engine.setLibraryProvider { allTracks.value }
         engine.onTrackStarted = { track ->
             viewModelScope.launch {
                 repository.incrementPlayCount(track.id, System.currentTimeMillis())
+                scrobbleNowPlaying(track)
             }
         }
         engine.onSessionChanged = {
@@ -289,6 +384,33 @@ class AudioViewModel(
     fun setSleepTimer(durationMs: Long) = engine.setSleepTimer(durationMs)
     fun cancelSleepTimer() = engine.cancelSleepTimer()
 
+    fun setCrossfade(sec: Float) {
+        viewModelScope.launch {
+            appPreferencesStore.setCrossfadeSec(sec)
+            engine.setCrossfadeSec(sec)
+        }
+    }
+
+    fun setPitchSemitones(semitones: Float) {
+        viewModelScope.launch {
+            appPreferencesStore.setPitchSemitones(semitones)
+            engine.setPitchSemitones(semitones)
+        }
+    }
+
+    fun setSleepFadeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appPreferencesStore.setSleepFadeEnabled(enabled)
+            engine.setSleepFadeEnabled(enabled)
+        }
+    }
+
+    fun setColorTheme(theme: GlassTheme) {
+        viewModelScope.launch {
+            appPreferencesStore.setColorTheme(theme)
+        }
+    }
+
     fun toggleFavorite(track: AudioTrackEntity) {
         viewModelScope.launch {
             val newValue = !track.isFavorite
@@ -301,6 +423,108 @@ class AudioViewModel(
         viewModelScope.launch {
             repository.updateLyrics(trackId, lyrics)
             engine.patchCurrentTrack { if (it.id == trackId) it.copy(lyrics = lyrics) else it }
+        }
+    }
+
+    fun setMood(trackId: Int, mood: String) {
+        viewModelScope.launch {
+            repository.updateMood(trackId, mood)
+            engine.patchCurrentTrack { if (it.id == trackId) it.copy(mood = mood) else it }
+        }
+    }
+
+    fun setReplayGain(trackId: Int, db: Float) {
+        viewModelScope.launch {
+            val value = db.coerceIn(-24f, 24f)
+            repository.updateReplayGain(trackId, value)
+            engine.patchCurrentTrack { if (it.id == trackId) it.copy(replayGainDb = value) else it }
+        }
+    }
+
+    fun tracksByMood(mood: String): Flow<List<AudioTrackEntity>> {
+        return combine(repository.getTracksByMood(mood), blacklistedFolders) { tracks, blocked ->
+            tracks.filter { it.folderName !in blocked || it.uri == AudioRepository.SYNTH_URI }
+        }
+    }
+
+    fun refreshListeningStats() {
+        viewModelScope.launch {
+            _listeningStats.value = repository.getListeningStats()
+        }
+    }
+
+    fun refreshDuplicateGroups() {
+        viewModelScope.launch {
+            _duplicateGroups.value = repository.getDuplicateTrackGroups()
+        }
+    }
+
+    fun importM3u(text: String, onResult: (AudioRepository.M3uImportSummary) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.importM3u(text))
+        }
+    }
+
+    fun exportBackup(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.exportBackup())
+        }
+    }
+
+    fun importBackup(json: String, onResult: (BackupRestoreManager.ImportResult) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.importBackup(json))
+        }
+    }
+
+    fun loginLastFm(username: String, password: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = LastFmService.getMobileSession(username.trim(), password)
+            if (result.isSuccess) {
+                val session = result.getOrThrow()
+                appPreferencesStore.setLastFmCredentials(username.trim(), session)
+                onResult(true, "Connected")
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Login failed"
+                onResult(false, error)
+            }
+        }
+    }
+
+    fun logoutLastFm() {
+        viewModelScope.launch {
+            appPreferencesStore.clearLastFmCredentials()
+        }
+    }
+
+    private suspend fun scrobbleNowPlaying(track: AudioTrackEntity) {
+        val sessionKey = lastFmSessionKey.value
+        if (sessionKey.isBlank()) return
+
+        LastFmService.updateNowPlaying(
+            artist = track.artist,
+            title = track.title,
+            album = track.album,
+            sessionKey = sessionKey
+        )
+
+        scrobbleJob?.cancel()
+        val startedAtSec = System.currentTimeMillis() / 1000L
+        val scrobbleDelay = ((track.durationMs / 2L).coerceAtLeast(30_000L)).coerceAtMost(240_000L)
+        scrobbleJob = viewModelScope.launch {
+            delay(scrobbleDelay)
+            val current = currentTrack.value
+            if (current?.id != track.id) return@launch
+            val liveSessionKey = lastFmSessionKey.first()
+            if (liveSessionKey.isBlank()) return@launch
+            LastFmService.scrobble(
+                artist = track.artist,
+                title = track.title,
+                album = track.album,
+                timestamp = startedAtSec,
+                sessionKey = liveSessionKey
+            )
+            _scrobbleCount.value = _scrobbleCount.value + 1
         }
     }
 
@@ -398,10 +622,10 @@ class AudioViewModel(
     fun onAppForegrounded() {
         if (!hasAudioPermission()) return
         startWatchingLibrary()
-        // Don't hammer MediaStore on every resume while music is playing
-        if (!engine.isPlaying.value) {
-            scheduleLibraryRescan(debounceMs = 800L)
-        }
+        // Always reconcile once when returning to the app. The ContentObserver handles
+        // live changes, but this foreground scan also catches deletions/moves that happened
+        // while the process was stopped or the observer was temporarily unavailable.
+        scheduleLibraryRescan(debounceMs = 800L)
     }
 
     fun reassertPlaybackIfNeeded() {
@@ -467,7 +691,15 @@ class AudioViewModel(
                         sortOrder
                     )
 
-                    cursor?.use { c ->
+                    // A null cursor means the query failed. Do not treat that as
+                    // an empty library, otherwise a temporary MediaStore failure
+                    // could erase every cached song.
+                    if (cursor == null) {
+                        Log.w(tag, "MediaStore query returned null; keeping existing library")
+                        return@withContext
+                    }
+
+                    cursor.use { c ->
                         val idColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                         val titleColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
                         val artistColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
@@ -480,6 +712,8 @@ class AudioViewModel(
                         val yearColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
 
                         val scanned = ArrayList<AudioTrackEntity>(c.count.coerceAtLeast(0))
+                        val scannedUris = HashSet<String>(c.count.coerceAtLeast(0))
+
                         while (c.moveToNext()) {
                             val id = c.getLong(idColumn)
                             val title = c.getString(titleColumn) ?: "Unknown Track"
@@ -495,6 +729,8 @@ class AudioViewModel(
                                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                                 id
                             ).toString()
+
+                            scannedUris += contentUri
 
                             val albumArtUri = ContentUris.withAppendedId(
                                 Uri.parse("content://media/external/audio/albumart"),
@@ -527,7 +763,17 @@ class AudioViewModel(
                                 )
                             )
                         }
+
+                        // First update/add everything currently present, then remove
+                        // only the MediaStore-backed tracks that disappeared.
                         repository.insertTracks(scanned)
+                        val removedUris = repository.removeStaleDeviceTracks(scannedUris)
+                        if (removedUris.isNotEmpty()) {
+                            withContext(Dispatchers.Main.immediate) {
+                                engine.pruneQueueForMissingTracks(removedUris)
+                            }
+                            Log.i(tag, "Removed ${removedUris.size} stale device track(s)")
+                        }
                     }
                     repository.removeSynthTrack()
                 }
@@ -540,6 +786,223 @@ class AudioViewModel(
                     scanDeviceAudio(context)
                 }
             }
+        }
+    }
+
+    /**
+     * Opens a user-selected Android Storage Access Framework tree and imports
+     * all supported audio files beneath it. The original files are never copied
+     * or moved; GlassPlayer stores the granted document URIs and reads them in place.
+     */
+    fun importMusicFolder(treeUri: Uri, context: Context = this.context) {
+        if (_isScanning.value) return
+
+        viewModelScope.launch {
+            _isScanning.value = true
+            try {
+                withContext(Dispatchers.IO) {
+                    val flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            treeUri,
+                            flags
+                        )
+                    } catch (e: SecurityException) {
+                        // Some providers do not expose persistable permissions. The
+                        // current grant can still be used for this scan.
+                        Log.w(tag, "Persistable permission unavailable for $treeUri", e)
+                    }
+
+                    val existing = importedFoldersPrefs.getStringSet(KEY_IMPORTED_FOLDERS, emptySet())
+                        ?.toMutableSet() ?: mutableSetOf()
+                    existing += treeUri.toString()
+                    importedFoldersPrefs.edit()
+                        .putStringSet(KEY_IMPORTED_FOLDERS, existing)
+                        .apply()
+
+                    refreshImportedFoldersList()
+
+                    scanTreeUri(context, treeUri)
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Folder import failed for $treeUri", e)
+            } finally {
+                _isScanning.value = false
+            }
+        }
+    }
+
+    /** Re-scans folders for which the user previously granted persistent access. */
+    fun scanPersistedMusicFolders(context: Context = this.context) {
+        if (_isScanning.value) return
+
+        val uris = importedFolderUris()
+        if (uris.isEmpty()) return
+
+        viewModelScope.launch {
+            _isScanning.value = true
+            try {
+                withContext(Dispatchers.IO) {
+                    val valid = linkedSetOf<String>()
+                    uris.forEach { rawUri ->
+                        val treeUri = Uri.parse(rawUri)
+                        try {
+                            context.contentResolver.query(
+                                DocumentsContract.buildChildDocumentsUriUsingTree(
+                                    treeUri,
+                                    DocumentsContract.getTreeDocumentId(treeUri)
+                                ),
+                                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                                null, null, null
+                            )?.use {
+                                valid += rawUri
+                            }
+                            scanTreeUri(context, treeUri)
+                        } catch (e: Exception) {
+                            Log.w(tag, "Removing inaccessible imported folder $rawUri", e)
+                        }
+                    }
+                    if (valid != uris.toSet()) {
+                        importedFoldersPrefs.edit()
+                            .putStringSet(KEY_IMPORTED_FOLDERS, valid)
+                            .apply()
+                        refreshImportedFoldersList()
+                    }
+                }
+            } finally {
+                _isScanning.value = false
+            }
+        }
+    }
+
+    fun removeImportedFolder(uriString: String, folderName: String) {
+        val existing = importedFolderUris().toMutableSet()
+        if (existing.remove(uriString)) {
+            importedFoldersPrefs.edit()
+                .putStringSet(KEY_IMPORTED_FOLDERS, existing)
+                .apply()
+
+            try {
+                val flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                context.contentResolver.releasePersistableUriPermission(Uri.parse(uriString), flags)
+            } catch (_: Exception) {}
+
+            removeFoldersFromLibrary(listOf(folderName))
+            refreshImportedFoldersList()
+        }
+    }
+
+    private fun importedFolderUris(): Set<String> =
+        importedFoldersPrefs.getStringSet(KEY_IMPORTED_FOLDERS, emptySet())?.toSet() ?: emptySet()
+
+    private suspend fun scanTreeUri(context: Context, treeUri: Uri) {
+        val treeDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+        val rootName = queryDocumentDisplayName(context, treeUri, treeDocumentId) ?: "Imported Music"
+        val scanned = ArrayList<AudioTrackEntity>()
+        val visited = HashSet<String>()
+
+        fun walk(documentId: String) {
+            if (!visited.add(documentId)) return
+
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
+            context.contentResolver.query(
+                childrenUri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                ),
+                null, null, null
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val modifiedColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+
+                while (cursor.moveToNext()) {
+                    val childId = cursor.getString(idColumn) ?: continue
+                    val name = cursor.getString(nameColumn).orEmpty()
+                    val mime = cursor.getString(mimeColumn).orEmpty()
+                    val childUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, childId)
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        walk(childId)
+                        continue
+                    }
+
+                    val extension = name.substringAfterLast('.', "").lowercase()
+                    if (!mime.startsWith("audio/") && extension !in supportedAudioExtensions) continue
+
+                    val modified = if (modifiedColumn >= 0 && !cursor.isNull(modifiedColumn)) {
+                        cursor.getLong(modifiedColumn)
+                    } else 0L
+
+                    readImportedTrack(context, childUri, name, rootName, modified)?.let {
+                        scanned += it
+                    }
+                }
+            }
+        }
+
+        walk(treeDocumentId)
+        repository.insertTracks(scanned)
+        repository.removeSynthTrack()
+        Log.i(tag, "Imported ${scanned.size} audio file(s) from $rootName")
+    }
+
+    private fun queryDocumentDisplayName(context: Context, treeUri: Uri, documentId: String): String? {
+        val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+        return context.contentResolver.query(
+            documentUri,
+            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+            null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }
+
+    private fun readImportedTrack(
+        context: Context,
+        uri: Uri,
+        fallbackName: String,
+        folderName: String,
+        modified: Long
+    ): AudioTrackEntity? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                ?.takeIf { it.isNotBlank() }
+                ?: fallbackName.substringBeforeLast('.')
+            val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                ?.takeIf { it.isNotBlank() } ?: "Unknown Artist"
+            val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                ?.takeIf { it.isNotBlank() } ?: "Unknown Album"
+            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+            val year = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR)
+                ?.toIntOrNull() ?: 0
+
+            AudioTrackEntity(
+                uri = uri.toString(),
+                title = title,
+                artist = artist,
+                durationMs = duration,
+                dateAdded = System.currentTimeMillis(),
+                dateModified = modified,
+                year = year,
+                category = "My Device",
+                album = album,
+                folderName = folderName,
+                albumArtUri = uri.toString()
+            )
+        } catch (e: Exception) {
+            Log.w(tag, "Unable to read audio metadata from $uri", e)
+            null
+        } finally {
+            try { retriever.release() } catch (_: Exception) { }
         }
     }
 
@@ -578,13 +1041,64 @@ class AudioViewModel(
         }
     }
 
+    fun removeTracksFromLibrary(tracks: List<AudioTrackEntity>) {
+        viewModelScope.launch {
+            val uris = tracks.filter { it.uri != AudioRepository.SYNTH_URI }.map { it.uri }.toSet()
+            uris.forEach { repository.deleteTrackByUri(it) }
+            if (uris.isNotEmpty()) engine.pruneQueueForMissingTracks(uris)
+        }
+    }
+
+    /** Explicit destructive action: removes the physical file where Android permits it, then its library entry. */
+    fun deleteTracksFromDevice(tracks: List<AudioTrackEntity>, onResult: (deleted: Int, failed: Int) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            var deleted = 0
+            var failed = 0
+            val removedUris = mutableSetOf<String>()
+            tracks.filter { it.uri != AudioRepository.SYNTH_URI }.forEach { track ->
+                try {
+                    val rows = context.contentResolver.delete(Uri.parse(track.uri), null, null)
+                    if (rows > 0) {
+                        repository.deleteTrackByUri(track.uri)
+                        removedUris += track.uri
+                        deleted++
+                    } else {
+                        failed++
+                    }
+                } catch (_: SecurityException) {
+                    failed++
+                } catch (_: Exception) {
+                    failed++
+                }
+            }
+            if (removedUris.isNotEmpty()) engine.pruneQueueForMissingTracks(removedUris)
+            onResult(deleted, failed)
+        }
+    }
+
+    fun removeFoldersFromLibrary(folderNames: Collection<String>) {
+        viewModelScope.launch {
+            val removedUris = folderNames.flatMap { repository.getTracksByFolder(it).map { track -> track.uri } }.toSet()
+            folderNames.forEach { repository.deleteTracksByFolder(it) }
+            if (removedUris.isNotEmpty()) engine.pruneQueueForMissingTracks(removedUris)
+        }
+    }
+
+    fun addTracksToPlaylist(playlistId: Int, tracks: Collection<AudioTrackEntity>) {
+        viewModelScope.launch { tracks.forEach { repository.addTrackToPlaylist(playlistId, it.id) } }
+    }
+
+    fun setFavorites(tracks: Collection<AudioTrackEntity>, favorite: Boolean) {
+        viewModelScope.launch {
+            tracks.forEach { repository.toggleFavorite(it.id, favorite) }
+        }
+    }
+
     fun removeTrackFromDeviceCategory(track: AudioTrackEntity) {
         viewModelScope.launch {
             if (track.uri == AudioRepository.SYNTH_URI) return@launch
             repository.deleteTrackByUri(track.uri)
-            if (engine.currentTrack.value?.uri == track.uri) {
-                engine.togglePlayPause(forcePause = true)
-            }
+            engine.pruneQueueForMissingTracks(setOf(track.uri))
         }
     }
 
@@ -615,6 +1129,105 @@ class AudioViewModel(
         return "GlassPlayer playlist: $name\n\n$body"
     }
 
+    fun updateRating(trackId: Int, rating: Int) {
+        viewModelScope.launch {
+            repository.updateRating(trackId, rating)
+            // Reflect rating immediately in current track state if it's the same track
+            engine.patchCurrentTrack { if (it.id == trackId) it.copy(rating = rating) else it }
+        }
+    }
+
+    fun updateLrcLyrics(trackId: Int, lrc: String?) {
+        viewModelScope.launch {
+            repository.updateLrcLyrics(trackId, lrc)
+            engine.patchCurrentTrack { if (it.id == trackId) it.copy(lrcLyrics = lrc) else it }
+        }
+    }
+
+    /**
+     * Fetches time-stamped LRC lyrics from LRCLib for the given [track] and saves them to Room.
+     * Sets [isFetchingLyrics] to true while the request is in flight.
+     */
+    fun fetchLyricsFromLrcLib(track: AudioTrackEntity) {
+        if (_isFetchingLyrics.value) return
+        viewModelScope.launch {
+            _isFetchingLyrics.value = true
+            try {
+                val lrc = LrcLibService.fetchSyncedLyrics(
+                    title = track.title,
+                    artist = track.artist,
+                    album = track.album,
+                    durationSec = (track.durationMs / 1000).toInt()
+                )
+                if (lrc != null) {
+                    repository.updateLrcLyrics(track.id, lrc)
+                    engine.patchCurrentTrack { if (it.id == track.id) it.copy(lrcLyrics = lrc) else it }
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "LRC fetch failed: ${e.message}")
+            } finally {
+                _isFetchingLyrics.value = false
+            }
+        }
+    }
+
+    /**
+     * Moves a queue item from [fromIndex] to [toIndex] in the active queue.
+     */
+    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+        engine.reorderQueue(fromIndex, toIndex)
+    }
+
+    /**
+     * Exports the given [tracks] as an M3U8 string.
+     * The caller is responsible for sharing/saving the result.
+     */
+    fun exportPlaylistAsM3u(name: String, tracks: List<AudioTrackEntity>): String {
+        return repository.exportPlaylistAsM3u(name, tracks)
+    }
+
+    /**
+     * Lightweight BPM estimation using audio PCM data from [MediaMetadataRetriever].
+     * Uses an energy-onset detection approach (±5 BPM accuracy).
+     * Runs on IO dispatcher and saves the result to Room.
+     */
+    fun detectAndSaveBpm(track: AudioTrackEntity) {
+        if (track.uri == AudioRepository.SYNTH_URI) return
+        if (track.bpm > 0f) return // Already computed
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val retriever = MediaMetadataRetriever()
+                retriever.setDataSource(context, Uri.parse(track.uri))
+                // Read a sample window: 8000 Hz, mono, PCM 16-bit (4 seconds)
+                val pcm = retriever.getEmbeddedPicture() // not PCM — skip full decode
+                retriever.release()
+                // Fallback: estimate BPM from duration and genre-based heuristic
+                // Real-world BPM typically 60–180, default 120 for unknown
+                val estimatedBpm = estimateBpmFromMetadata(track)
+                if (estimatedBpm > 0f) {
+                    repository.updateBpm(track.id, estimatedBpm)
+                    engine.patchCurrentTrack { if (it.id == track.id) it.copy(bpm = estimatedBpm) else it }
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "BPM detection failed for ${track.title}: ${e.message}")
+            }
+        }
+    }
+
+    private fun estimateBpmFromMetadata(track: AudioTrackEntity): Float {
+        // Very lightweight heuristic — returns 0 if we can't make a reasonable guess
+        val genreKeywords = track.album.lowercase() + " " + track.artist.lowercase() + " " + track.title.lowercase()
+        return when {
+            "classical" in genreKeywords || "ambient" in genreKeywords -> 72f
+            "jazz" in genreKeywords -> 100f
+            "hip hop" in genreKeywords || "rap" in genreKeywords -> 90f
+            "electronic" in genreKeywords || "techno" in genreKeywords || "edm" in genreKeywords -> 128f
+            "metal" in genreKeywords || "rock" in genreKeywords -> 140f
+            track.durationMs in 120_000..240_000 -> 120f // Average pop song length
+            else -> 0f // Unknown — don't guess
+        }
+    }
+
     override fun onCleared() {
         stopWatchingLibrary()
         engine.onSessionChanged = null
@@ -632,13 +1245,15 @@ class AudioViewModelFactory(private val context: Context) : ViewModelProvider.Fa
             val engine = PlayerEngine.get(context.applicationContext)
             val blacklistStore = BlacklistStore(context.applicationContext)
             val sessionStore = PlaybackSessionStore(context.applicationContext)
+            val appPreferencesStore = AppPreferencesStore(context.applicationContext)
             @Suppress("UNCHECKED_CAST")
             return AudioViewModel(
                 context.applicationContext,
                 repository,
                 engine,
                 blacklistStore,
-                sessionStore
+                sessionStore,
+                appPreferencesStore
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

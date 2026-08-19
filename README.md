@@ -18,6 +18,14 @@ Glassmorphic local music player for Android (Jetpack Compose).
 - Background playback with **MediaSession** notification / lock-screen controls
 - Shuffle with history, queue loop, volume, equalizer, sleep timer
 - **Playback speed** 0.5x–2.0x (Extras panel) for music and synth
+- Android Auto browse support (All Songs, Favorites, Recently Played, Playlists)
+
+### Last.fm setup
+- Add credentials as Gradle properties or environment variables:
+	- `LASTFM_API_KEY`
+	- `LASTFM_API_SECRET`
+- Recommended (local only): put them in your user Gradle file (`~/.gradle/gradle.properties`) or OS environment.
+- Project build reads these values into `BuildConfig` automatically.
 
 ### UI / UX
 - Vibrant glassmorphism with **dynamic accent colors** from album art (Palette API)

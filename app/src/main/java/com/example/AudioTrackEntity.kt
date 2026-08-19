@@ -24,7 +24,17 @@ data class AudioTrackEntity(
     val album: String = "Glassmorphic Dreams",
     val folderName: String = "Default",
     val albumArtUri: String? = null,
-    val lyrics: String? = null
+    val lyrics: String? = null,
+    /** Star rating 0 (unrated) to 5. */
+    val rating: Int = 0,
+    /** Time-stamped LRC lyrics content, e.g. "[00:12.34] Line text" */
+    val lrcLyrics: String? = null,
+    /** Detected BPM (0 = not yet computed). */
+    val bpm: Float = 0f,
+    /** Replay Gain offset in dB; applied as a volume multiplier when loading the track. */
+    val replayGainDb: Float = 0f,
+    /** User-assigned mood tag: Chill, Hype, Focus, Sad, Party, Workout, or empty. */
+    val mood: String = ""
 )
 
 @Entity(tableName = "playlists")

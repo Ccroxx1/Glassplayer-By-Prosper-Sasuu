@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -9,12 +11,35 @@ android {
   namespace = "com.example"
   compileSdk = 36
 
+  fun quoteForBuildConfig(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+  }
+
     defaultConfig {
         applicationId = "com.aistudio.glassaudioplayer.vwbxta"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 4
+        versionName = "v1.2.1"
+
+      val localProperties = Properties()
+      val localPropertiesFile = project.rootProject.file("local.properties")
+      if (localPropertiesFile.exists()) {
+        localProperties.load(localPropertiesFile.inputStream())
+      }
+
+      val lastFmApiKey =
+        (project.findProperty("LASTFM_API_KEY") as String?)
+          ?: localProperties.getProperty("LASTFM_API_KEY")
+          ?: System.getenv("LASTFM_API_KEY")
+          ?: ""
+      val lastFmApiSecret =
+        (project.findProperty("LASTFM_API_SECRET") as String?)
+          ?: localProperties.getProperty("LASTFM_API_SECRET")
+          ?: System.getenv("LASTFM_API_SECRET")
+          ?: ""
+      buildConfigField("String", "LASTFM_API_KEY", quoteForBuildConfig(lastFmApiKey))
+      buildConfigField("String", "LASTFM_API_SECRET", quoteForBuildConfig(lastFmApiSecret))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

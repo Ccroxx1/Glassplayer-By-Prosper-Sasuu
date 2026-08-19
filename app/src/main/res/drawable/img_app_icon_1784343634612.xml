@@ -1,16 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Neon Border (Scaled to fit within the 72dp safe area) -->
+    <!-- Safe Area: 18,18 to 90,90. We use 20,20 to 88,88 -->
     <path
-        android:fillColor="#00F0FF"
-        android:pathData="M54,18c-8,0 -14,6 -14,14v22c0,3 1,5 3,7l11,11c1,1 3,1 4,0l11,-11c2,-2 3,-4 3,-7V32c0,-8 -6,-14 -14,-14z" />
+        android:pathData="M30,20h48c5.5,0 10,4.5 10,10v48c0,5.5 -4.5,10 -10,10h-48c-5.5,0 -10,-4.5 -10,-10v-48c0,-5.5 4.5,-10 10,-10z"
+        android:strokeWidth="1.5">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="88"
+                android:endY="88"
+                android:startX="20"
+                android:startY="20"
+                android:type="linear">
+                <item android:color="#00C2FF" android:offset="0.0" />
+                <item android:color="#9D00FF" android:offset="0.5" />
+                <item android:color="#FF007F" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Main Pill Shape (Glassy Cyan) -->
     <path
-        android:fillColor="#FF007F"
-        android:pathData="M40,72c0,8 6,14 14,14s14,-6 14,-14H40z" />
+        android:pathData="M54,30c-7,0 -13,6 -13,13v15c0,1.5 0.5,3 1.5,4l7,7c2,2 5,2 7,0l7,-7c1,-1 1.5,-2.5 1.5,-4V43c0,-7 -6,-13 -13,-13z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="43"
+                android:gradientRadius="30"
+                android:type="radial">
+                <item android:color="#00F0FF" android:offset="0.0" />
+                <item android:color="#0066FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Base Semi-circle (Neon Magenta) -->
+    <path
+        android:pathData="M43,65c0,6 5,11 11,11s11,-5 11,-11h-22z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="70"
+                android:gradientRadius="15"
+                android:type="radial">
+                <item android:color="#FF007F" android:offset="0.0" />
+                <item android:color="#800040" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Bars (Purple Glow) -->
     <path
         android:fillColor="#9D00FF"
-        android:pathData="M48,38h4v20h-4zM56,42h4v16h-4z" />
+        android:pathData="M49,42h2c0.5,0 1,0.5 1,1v14c0,0.5 -0.5,1 -1,1h-2c-0.5,0 -1,-0.5 -1,-1V43c0,-0.5 0.5,-1 1,-1z" />
+    <path
+        android:fillColor="#9D00FF"
+        android:pathData="M56,46h2c0.5,0 1,0.5 1,1v10c0,0.5 -0.5,1 -1,1h-2c-0.5,0 -1,-0.5 -1,-1V47c0,-0.5 0.5,-1 1,-1z" />
+
 </vector>

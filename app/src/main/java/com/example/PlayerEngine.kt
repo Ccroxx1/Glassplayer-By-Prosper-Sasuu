@@ -12,6 +12,7 @@ import android.media.audiofx.Equalizer
 import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -101,7 +102,23 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private val _sleepTimerRemainingMs = MutableStateFlow(0L)
     val sleepTimerRemainingMs: StateFlow<Long> = _sleepTimerRemainingMs.asStateFlow()
 
+    /** Crossfade duration in seconds (0 = disabled). */
+    private val _crossfadeSec = MutableStateFlow(0f)
+    val crossfadeSec: StateFlow<Float> = _crossfadeSec.asStateFlow()
+
+    /** Pitch shift in semitones (-6..+6, 0 = normal). */
+    private val _pitchSemitones = MutableStateFlow(0f)
+    val pitchSemitones: StateFlow<Float> = _pitchSemitones.asStateFlow()
+
+    /** When true, the sleep timer fades volume to 0 over the last 30 s before stopping. */
+    private val _sleepFadeEnabled = MutableStateFlow(false)
+    val sleepFadeEnabled: StateFlow<Boolean> = _sleepFadeEnabled.asStateFlow()
+
     private var exoPlayer: ExoPlayer? = null
+    /** Secondary ExoPlayer used during crossfade transitions. */
+    private var crossfadePlayer: ExoPlayer? = null
+    private var crossfadeJob: Job? = null
+    private var autoCrossfadeTriggerTrackId: Int? = null
     private val synth = ProceduralSynth()
     private var visualizer: Visualizer? = null
     private var equalizer: Equalizer? = null
@@ -154,8 +171,37 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     updateSessionMetadata(_currentTrack.value ?: return)
                     updateSessionState()
                 }
-                Player.STATE_ENDED -> onTrackCompleted()
+                Player.STATE_ENDED -> {
+                    // Only handle completion if the playlist is empty or we reached the end
+                    if (player.mediaItemCount <= 1 || player.nextMediaItemIndex == C.INDEX_UNSET) {
+                        onTrackCompleted()
+                    }
+                }
                 else -> Unit
+            }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val player = exoPlayer ?: return
+            val trackId = mediaItem?.mediaId?.toIntOrNull() ?: return
+            val track = _activeQueue.value.find { it.id == trackId } ?: return
+
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                // Gapless auto-transition
+                _currentTrack.value = track
+                _playbackPosition.value = 0L
+                val dur = player.duration
+                _playbackDuration.value = if (dur > 0 && dur != C.TIME_UNSET) dur else track.durationMs
+                updateSessionMetadata(track)
+                updateSessionState()
+                ensureServiceRunning()
+                onTrackStarted?.invoke(track)
+                notifySessionChanged()
+
+                // Pre-load the next track into the playlist if crossfade is disabled
+                if (_crossfadeSec.value <= 0f) {
+                    prepareNextTrackForGapless()
+                }
             }
         }
 
@@ -276,9 +322,13 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     private fun applyEngineVolumes(level: Float) {
-        val v = level.coerceIn(0f, 1f)
+        val base = level.coerceIn(0f, 1f)
+        val replayGainDb = _currentTrack.value?.replayGainDb ?: 0f
+        // Apply per-track ReplayGain inside ExoPlayer while preserving the system master volume.
+        val gainMultiplier = Math.pow(10.0, (replayGainDb / 20.0).toDouble()).toFloat()
+        val v = (base * gainMultiplier).coerceIn(0f, 1f)
         exoPlayer?.volume = v
-        synth.volume = v * 0.7f
+        synth.volume = base * 0.7f
     }
 
     fun setLibraryProvider(provider: () -> List<AudioTrackEntity>) {
@@ -311,6 +361,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
         )
 
         mediaSession = MediaSessionCompat(appContext, "GlassPlayer").apply {
+            @Suppress("DEPRECATION")
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
                     MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
@@ -334,6 +385,19 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 override fun onSkipToPrevious() = previousTrack()
 
                 override fun onSeekTo(pos: Long) = seekTo(pos)
+
+                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                    val id = mediaId ?: return
+                    val track = libraryFallback().firstOrNull { it.uri == id }
+                    if (track != null) {
+                        playTrack(track)
+                        return
+                    }
+                    val numericId = id.toIntOrNull()
+                    if (numericId != null) {
+                        libraryFallback().firstOrNull { it.id == numericId }?.let { playTrack(it) }
+                    }
+                }
 
                 override fun onStop() {
                     userWantsPlaying = false
@@ -381,6 +445,23 @@ class PlayerEngine private constructor(private val appContext: Context) {
         return player
     }
 
+    private fun ensureCrossfadePlayer(): ExoPlayer {
+        crossfadePlayer?.let { return it }
+        val player = ExoPlayer.Builder(appContext)
+            .setAudioAttributes(
+                ExoAudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                /* handleAudioFocus= */ false
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
+        crossfadePlayer = player
+        return player
+    }
+
     fun getSessionToken(): MediaSessionCompat.Token? = mediaSession?.sessionToken
 
     fun getMediaSession(): MediaSessionCompat? = mediaSession
@@ -400,6 +481,9 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 notifySessionChanged()
             }
         } else {
+            if (_crossfadeSec.value <= 0f) {
+                prepareNextTrackForGapless()
+            }
             updateSessionState()
             notifySessionChanged()
         }
@@ -437,6 +521,51 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 notifySessionChanged()
             }
         } else {
+            if (_crossfadeSec.value <= 0f) {
+                prepareNextTrackForGapless()
+            }
+            updateSessionState()
+            notifySessionChanged()
+        }
+    }
+
+    /**
+     * Removes tracks that disappeared from MediaStore from the active queue.
+     * If the current track disappeared, move to the first remaining track.
+     * A previously paused track remains paused after the replacement is loaded.
+     */
+    fun pruneQueueForMissingTracks(missingUris: Set<String>) {
+        if (missingUris.isEmpty()) return
+
+        val current = _currentTrack.value
+        val wasPlaying = _isPlaying.value
+        val pruned = _activeQueue.value.filterNot { it.uri in missingUris }
+        val currentMissing = current?.uri?.let { it in missingUris } == true
+
+        if (pruned.size == _activeQueue.value.size && !currentMissing) return
+
+        _activeQueue.value = pruned
+
+        if (currentMissing) {
+            if (pruned.isNotEmpty()) {
+                val next = pruned.first()
+                playTrack(next, pruned)
+                if (!wasPlaying) {
+                    togglePlayPause(forcePause = true)
+                }
+            } else {
+                userWantsPlaying = false
+                togglePlayPause(forcePause = true)
+                _currentTrack.value = null
+                _playbackPosition.value = 0L
+                _playbackDuration.value = 0L
+                updateSessionState()
+                notifySessionChanged()
+            }
+        } else {
+            if (_crossfadeSec.value <= 0f) {
+                prepareNextTrackForGapless()
+            }
             updateSessionState()
             notifySessionChanged()
         }
@@ -460,6 +589,9 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
         queue.add(currentIndex + 1, track)
         _activeQueue.value = queue
+        if (_crossfadeSec.value <= 0f) {
+            prepareNextTrackForGapless()
+        }
         updateSessionState()
         notifySessionChanged()
     }
@@ -483,6 +615,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
         stopEngine(keepSession = true)
         _currentTrack.value = track
+        autoCrossfadeTriggerTrackId = null
         userWantsPlaying = true
         _playbackPosition.value = 0L
         pausedByTransientFocusLoss = false
@@ -501,10 +634,23 @@ class PlayerEngine private constructor(private val appContext: Context) {
         } else {
             try {
                 val player = ensureExoPlayer()
-                player.setMediaItem(MediaItem.fromUri(Uri.parse(track.uri)))
-                player.repeatMode = Player.REPEAT_MODE_OFF
+                player.stop()
+                player.clearMediaItems()
+                val mediaItem = MediaItem.Builder()
+                    .setUri(Uri.parse(track.uri))
+                    .setMediaId(track.id.toString())
+                    .build()
+                player.setMediaItem(mediaItem)
+                
+                player.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                
                 player.prepare()
                 player.playWhenReady = focusGranted
+                
+                if (_crossfadeSec.value <= 0f) {
+                    prepareNextTrackForGapless()
+                }
+
                 if (focusGranted) {
                     applyPlaybackSpeedToEngines()
                     applyVolumeToEngines()
@@ -525,6 +671,50 @@ class PlayerEngine private constructor(private val appContext: Context) {
         ensureServiceRunning()
         onTrackStarted?.invoke(track)
         notifySessionChanged()
+    }
+
+    /** Calculates and adds the next track to ExoPlayer's playlist for gapless playback. */
+    private fun prepareNextTrackForGapless() {
+        val player = exoPlayer ?: return
+        val current = _currentTrack.value ?: return
+        val queue = _activeQueue.value
+        if (queue.isEmpty() || current.uri == AudioRepository.SYNTH_URI) return
+
+        // Clean up playlist: keep only the currently playing item at index 0
+        val curIdx = player.currentMediaItemIndex
+        if (curIdx > 0) {
+            repeat(curIdx) {
+                player.removeMediaItem(0)
+            }
+        }
+        while (player.mediaItemCount > 1) {
+            player.removeMediaItem(1)
+        }
+
+        // If repeating one song, ExoPlayer's REPEAT_MODE_ONE handles gapless internally
+        if (_repeatMode.value == RepeatMode.ONE) return
+
+        val currentIndex = queue.indexOfFirst { it.id == current.id }
+        val nextIndex = when {
+            _isShuffleEnabled.value -> pickShuffleIndex(queue.size, currentIndex)
+            else -> {
+                if (currentIndex >= queue.lastIndex) {
+                    if (_repeatMode.value == RepeatMode.ALL) 0 else -1
+                } else currentIndex + 1
+            }
+        }
+
+        if (nextIndex != -1) {
+            val nextTrack = queue[nextIndex]
+            if (nextTrack.uri != AudioRepository.SYNTH_URI) {
+                player.addMediaItem(
+                    MediaItem.Builder()
+                        .setUri(Uri.parse(nextTrack.uri))
+                        .setMediaId(nextTrack.id.toString())
+                        .build()
+                )
+            }
+        }
     }
 
     /**
@@ -549,6 +739,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
             stopEngine(keepSession = true)
             _currentTrack.value = track
+            autoCrossfadeTriggerTrackId = null
             val clampedPos = positionMs.coerceAtLeast(0L)
             _playbackPosition.value = clampedPos
             _playbackDuration.value = track.durationMs.coerceAtLeast(0L)
@@ -573,11 +764,20 @@ class PlayerEngine private constructor(private val appContext: Context) {
             } else {
                 try {
                     val player = ensureExoPlayer()
-                    player.setMediaItem(MediaItem.fromUri(Uri.parse(track.uri)))
-                    player.repeatMode = Player.REPEAT_MODE_OFF
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(Uri.parse(track.uri))
+                        .setMediaId(track.id.toString())
+                        .build()
+                    player.setMediaItem(mediaItem)
+                    player.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                     player.prepare()
                     player.seekTo(clampedPos)
                     player.playWhenReady = shouldPlay
+                    
+                    if (_crossfadeSec.value <= 0f) {
+                        prepareNextTrackForGapless()
+                    }
+
                     applyPlaybackSpeedToEngines()
                     applyVolumeToEngines()
                     if (shouldPlay) {
@@ -702,7 +902,78 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 }
             }
         }
-        playTrack(queue[nextIndex])
+        val next = queue[nextIndex]
+        if (tryCrossfadeTo(next)) return
+        playTrack(next)
+    }
+
+    private fun tryCrossfadeTo(nextTrack: AudioTrackEntity): Boolean {
+        val currentTrack = _currentTrack.value ?: return false
+        val fadeSec = _crossfadeSec.value
+        if (fadeSec <= 0f) return false
+        if (currentTrack.uri == AudioRepository.SYNTH_URI || nextTrack.uri == AudioRepository.SYNTH_URI) return false
+        if (currentTrack.id == nextTrack.id) return false
+
+        val primary = exoPlayer ?: return false
+        if (!requestPlaybackFocus()) return false
+
+        return try {
+            val incoming = ensureCrossfadePlayer()
+            incoming.stop()
+            incoming.clearMediaItems()
+            incoming.setMediaItem(MediaItem.fromUri(Uri.parse(nextTrack.uri)))
+            incoming.repeatMode = Player.REPEAT_MODE_OFF
+            incoming.volume = 0f
+            incoming.prepare()
+            applyPlaybackSpeedToEngines()
+            incoming.playWhenReady = true
+            incoming.play()
+
+            _currentTrack.value = nextTrack
+            _playbackPosition.value = 0L
+            _playbackDuration.value = nextTrack.durationMs
+            _isPlaying.value = true
+            userWantsPlaying = true
+            pausedByTransientFocusLoss = false
+            updateSessionMetadata(nextTrack)
+            updateSessionState()
+            ensureServiceRunning()
+            onTrackStarted?.invoke(nextTrack)
+            notifySessionChanged()
+
+            crossfadeJob?.cancel()
+            crossfadeJob = scope.launch {
+                val steps = (fadeSec * 20f).toInt().coerceIn(8, 240)
+                val stepDelayMs = (fadeSec * 1000f / steps).toLong().coerceAtLeast(10L)
+                val base = _volume.value.coerceIn(0f, 1f)
+                val outgoingBase = if (primary.isPlaying) base else 0f
+
+                repeat(steps) { idx ->
+                    val t = (idx + 1).toFloat() / steps.toFloat()
+                    primary.volume = outgoingBase * (1f - t)
+                    incoming.volume = base * t
+                    delay(stepDelayMs)
+                }
+
+                // Swap players so progress/completion listeners target the active one.
+                primary.removeListener(playerListener)
+                incoming.addListener(playerListener)
+                exoPlayer = incoming
+                crossfadePlayer = primary
+                try {
+                    primary.pause()
+                    primary.stop()
+                    primary.clearMediaItems()
+                } catch (_: Exception) {
+                }
+                applyVolumeToEngines()
+                startProgressTracker(isSynth = false)
+            }
+            true
+        } catch (e: Exception) {
+            Log.w(tag, "Crossfade transition failed", e)
+            false
+        }
     }
 
     private fun onTrackCompleted() {
@@ -779,6 +1050,9 @@ class PlayerEngine private constructor(private val appContext: Context) {
     fun toggleShuffle() {
         _isShuffleEnabled.value = !_isShuffleEnabled.value
         if (!_isShuffleEnabled.value) shuffleHistory.clear()
+        if (_crossfadeSec.value <= 0f) {
+            prepareNextTrackForGapless()
+        }
         updateSessionState()
         notifySessionChanged()
     }
@@ -788,6 +1062,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
             RepeatMode.OFF -> RepeatMode.ALL
             RepeatMode.ALL -> RepeatMode.ONE
             RepeatMode.ONE -> RepeatMode.OFF
+        }
+        exoPlayer?.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+        if (_crossfadeSec.value <= 0f) {
+            prepareNextTrackForGapless()
         }
         updateSessionState()
         notifySessionChanged()
@@ -810,6 +1088,31 @@ class PlayerEngine private constructor(private val appContext: Context) {
         applyPlaybackSpeedToEngines()
         applySynthControls()
         updateSessionState()
+    }
+
+    fun setCrossfadeSec(sec: Float) {
+        val old = _crossfadeSec.value
+        _crossfadeSec.value = sec.coerceIn(0f, 10f)
+        if (old <= 0f && _crossfadeSec.value > 0f) {
+            // Transitioning from gapless to crossfade: clear pre-loaded items
+            exoPlayer?.let { player ->
+                while (player.mediaItemCount > 1) {
+                    player.removeMediaItem(1)
+                }
+            }
+        } else if (old > 0f && _crossfadeSec.value <= 0f) {
+            // Transitioning from crossfade to gapless: pre-load next track
+            prepareNextTrackForGapless()
+        }
+    }
+
+    fun setPitchSemitones(semitones: Float) {
+        _pitchSemitones.value = semitones.coerceIn(-6f, 6f)
+        applyPlaybackSpeedToEngines()
+    }
+
+    fun setSleepFadeEnabled(enabled: Boolean) {
+        _sleepFadeEnabled.value = enabled
     }
 
     fun setVolume(level: Float) {
@@ -854,14 +1157,25 @@ class PlayerEngine private constructor(private val appContext: Context) {
             return
         }
         _sleepTimerRemainingMs.value = durationMs
+        val fadeMs = 30_000L   // fade starts in the last 30 s
         sleepTimerJob = scope.launch {
             var remaining = durationMs
+            var fadingVolume: Float? = null
             while (remaining > 0 && isActive) {
                 delay(1000)
                 remaining -= 1000
                 _sleepTimerRemainingMs.value = remaining.coerceAtLeast(0)
+
+                // Volume fade: when sleepFade is enabled and we're in the last fadeMs
+                if (_sleepFadeEnabled.value && remaining in 0L..fadeMs) {
+                    val fraction = remaining.toFloat() / fadeMs.toFloat()   // 1.0 -> 0.0
+                    if (fadingVolume == null) fadingVolume = _volume.value
+                    applyEngineVolumes(fadingVolume!! * fraction)
+                }
             }
             if (isActive) {
+                // Restore volume before stopping so next play starts normally
+                if (fadingVolume != null) applyEngineVolumes(fadingVolume!!)
                 togglePlayPause(forcePause = true)
                 _sleepTimerRemainingMs.value = 0L
             }
@@ -875,6 +1189,21 @@ class PlayerEngine private constructor(private val appContext: Context) {
         _currentTrack.value = transform(current)
         _currentTrack.value?.let { updateSessionMetadata(it) }
     }
+
+    /** Moves the queue item at [fromIndex] to [toIndex]. No-op if indices are out of range. */
+    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+        val queue = _activeQueue.value.toMutableList()
+        if (fromIndex < 0 || fromIndex >= queue.size) return
+        if (toIndex < 0 || toIndex >= queue.size) return
+        if (fromIndex == toIndex) return
+        val item = queue.removeAt(fromIndex)
+        queue.add(toIndex, item)
+        _activeQueue.value = queue
+        if (_crossfadeSec.value <= 0f) {
+            prepareNextTrackForGapless()
+        }
+    }
+
 
     /**
      * Fully stops playback and releases ExoPlayer, synth, audio focus, effects,
@@ -911,6 +1240,12 @@ class PlayerEngine private constructor(private val appContext: Context) {
             Log.w(tag, "ExoPlayer release failed", e)
         }
         exoPlayer = null
+        try {
+            crossfadePlayer?.release()
+        } catch (e: Exception) {
+            Log.w(tag, "Crossfade ExoPlayer release failed", e)
+        }
+        crossfadePlayer = null
         onTrackStarted = null
         onSessionChanged = null
         _activeQueue.value = emptyList()
@@ -942,7 +1277,14 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     private fun applyPlaybackSpeedToEngines() {
         val speed = _playbackSpeed.value
-        exoPlayer?.setPlaybackSpeed(speed)
+        // Convert semitone shift to pitch multiplier: 2^(n/12)
+        val pitchMultiplier = Math.pow(2.0, (_pitchSemitones.value / 12.0).toDouble()).toFloat()
+        exoPlayer?.setPlaybackParameters(
+            androidx.media3.common.PlaybackParameters(speed, pitchMultiplier)
+        )
+        crossfadePlayer?.setPlaybackParameters(
+            androidx.media3.common.PlaybackParameters(speed, pitchMultiplier)
+        )
     }
 
     private fun applyVolumeToEngines() {
@@ -1036,9 +1378,17 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     private fun stopEngine(keepSession: Boolean = false) {
         progressJob?.cancel()
+        crossfadeJob?.cancel()
         synth.stop()
         releaseAudioEffects()
         exoPlayer?.let { player ->
+            try {
+                player.stop()
+                player.clearMediaItems()
+            } catch (_: Exception) {
+            }
+        }
+        crossfadePlayer?.let { player ->
             try {
                 player.stop()
                 player.clearMediaItems()
@@ -1071,6 +1421,24 @@ class PlayerEngine private constructor(private val appContext: Context) {
                             val dur = player.duration
                             if (dur > 0 && dur != C.TIME_UNSET) {
                                 _playbackDuration.value = dur
+                            }
+
+                            val track = _currentTrack.value
+                            val fadeMs = (_crossfadeSec.value * 1000f).toLong().coerceAtLeast(250L)
+                            if (
+                                track != null &&
+                                track.uri != AudioRepository.SYNTH_URI &&
+                                _crossfadeSec.value > 0f &&
+                                _repeatMode.value != RepeatMode.ONE &&
+                                autoCrossfadeTriggerTrackId != track.id &&
+                                player.isPlaying
+                            ) {
+                                val remainingMs = dur - _playbackPosition.value
+                                if (remainingMs in 1L..fadeMs) {
+                                    autoCrossfadeTriggerTrackId = track.id
+                                    nextTrack(fromUser = false)
+                                    continue
+                                }
                             }
                         }
                     }
@@ -1229,6 +1597,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
         lastNotificationKey = key
         lastNotificationAt = now
         PlaybackService.updateNotification(appContext)
+        try {
+            GlassPlayerWidget.notifyUpdate(appContext)
+        } catch (_: Exception) {
+            // Widgets are optional; playback must never depend on AppWidgetManager.
+        }
     }
 
     /** @return true when audio focus was granted immediately. */

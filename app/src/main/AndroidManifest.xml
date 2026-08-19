@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"
@@ -23,6 +25,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -45,6 +51,15 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".GlassAutoService"
+            android:exported="true"
+            android:permission="android.permission.BIND_MEDIA_BROWSER_SERVICE">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
         <!-- Required for lock screen / headset / Bluetooth media buttons -->
         <receiver
             android:name="androidx.media.session.MediaButtonReceiver"
@@ -53,6 +68,23 @@
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
+        </receiver>
+
+        <!-- Home-screen widget -->
+        <receiver
+            android:name=".GlassPlayerWidget"
+            android:exported="true"
+            android:label="GlassPlayer">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.WIDGET_PLAY_PAUSE" />
+                <action android:name="com.example.WIDGET_NEXT" />
+                <action android:name="com.example.WIDGET_PREV" />
+                <action android:name="com.example.WIDGET_FAVORITE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
         </receiver>
     </application>
 
