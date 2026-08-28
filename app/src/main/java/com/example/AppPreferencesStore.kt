@@ -25,6 +25,8 @@ class AppPreferencesStore(private val context: Context) {
         private val KEY_PITCH_SEMITONES = floatPreferencesKey("pitch_semitones")
         private val KEY_SLEEP_FADE_ENABLED = booleanPreferencesKey("sleep_fade_enabled")
         private val KEY_COLOR_THEME = stringPreferencesKey("color_theme")
+        private val KEY_LANGUAGE = stringPreferencesKey("app_language")
+        private val KEY_FIRST_LAUNCH = booleanPreferencesKey("is_first_launch")
         private val KEY_LASTFM_USERNAME = stringPreferencesKey("lastfm_username")
         private val KEY_LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
     }
@@ -65,6 +67,23 @@ class AppPreferencesStore(private val context: Context) {
 
     suspend fun setColorTheme(theme: GlassTheme) {
         context.appPrefsDataStore.edit { it[KEY_COLOR_THEME] = theme.name }
+    }
+
+    // ── Language ─────────────────────────────────────────────────────────────
+    val appLanguage: Flow<String> = context.appPrefsDataStore.data.map {
+        it[KEY_LANGUAGE] ?: "English"
+    }
+
+    suspend fun setAppLanguage(lang: String) {
+        context.appPrefsDataStore.edit { it[KEY_LANGUAGE] = lang }
+    }
+
+    val isFirstLaunch: Flow<Boolean> = context.appPrefsDataStore.data.map {
+        it[KEY_FIRST_LAUNCH] ?: true
+    }
+
+    suspend fun setFirstLaunchCompleted() {
+        context.appPrefsDataStore.edit { it[KEY_FIRST_LAUNCH] = false }
     }
 
     // ── Last.fm ──────────────────────────────────────────────────────────────

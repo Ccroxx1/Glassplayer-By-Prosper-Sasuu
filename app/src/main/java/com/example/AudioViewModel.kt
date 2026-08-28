@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -150,6 +151,16 @@ class AudioViewModel(
 
     val colorTheme: StateFlow<String> = appPreferencesStore.colorTheme
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GlassTheme.DYNAMIC.name)
+
+    val appLanguage: StateFlow<String> = appPreferencesStore.appLanguage
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "English")
+
+    val uiStrings: StateFlow<LanguageStrings> = appLanguage
+        .map { Localization.getStrings(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Localization.getStrings("English"))
+
+    val isFirstLaunch: StateFlow<Boolean> = appPreferencesStore.isFirstLaunch
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val lastFmUsername: StateFlow<String> = appPreferencesStore.lastFmUsername
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
@@ -408,6 +419,18 @@ class AudioViewModel(
     fun setColorTheme(theme: GlassTheme) {
         viewModelScope.launch {
             appPreferencesStore.setColorTheme(theme)
+        }
+    }
+
+    fun setAppLanguage(lang: String) {
+        viewModelScope.launch {
+            appPreferencesStore.setAppLanguage(lang)
+        }
+    }
+
+    fun completeFirstLaunch() {
+        viewModelScope.launch {
+            appPreferencesStore.setFirstLaunchCompleted()
         }
     }
 

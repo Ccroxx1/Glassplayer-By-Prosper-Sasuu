@@ -85,6 +85,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -130,7 +131,9 @@ fun openAppNotificationSettings(context: android.content.Context) {
 @Composable
 fun GlassPlayerApp(viewModel: AudioViewModel) {
     val context = LocalContext.current
-    var activeTab by remember { mutableStateOf("Browse") }
+    val strings by viewModel.uiStrings.collectAsState()
+
+    var activeTab by remember(strings) { mutableStateOf(strings.browse) }
     val musicFolderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { treeUri ->
@@ -138,6 +141,13 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
     }
     val currentTrackForTheme by viewModel.currentTrack.collectAsState()
     val selectedThemeName by viewModel.colorTheme.collectAsState()
+
+    var showPreferences by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
+    var showMusicSources by remember { mutableStateOf(false) }
+
+    val isFirstLaunch by viewModel.isFirstLaunch.collectAsState()
 
     // Dynamic glass accents from the current song's album art
     LaunchedEffect(currentTrackForTheme?.id, currentTrackForTheme?.albumArtUri, selectedThemeName) {
@@ -230,6 +240,45 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                 alpha = 0.5f
             )
 
+            if (showPreferences) {
+                PreferencesDialog(viewModel = viewModel, onDismiss = { showPreferences = false }, strings = strings)
+            }
+            if (showSettings) {
+                SettingsDialog(
+                    viewModel = viewModel,
+                    onDismiss = { showSettings = false },
+                    onManageSources = {
+                        showSettings = false
+                        showMusicSources = true
+                    },
+                    strings = strings
+                )
+            }
+            if (showAbout) {
+                AboutDialog(onDismiss = { showAbout = false }, strings = strings)
+            }
+            if (showMusicSources) {
+                MusicSourcesDialog(
+                    viewModel = viewModel,
+                    onDismiss = { showMusicSources = false },
+                    onAddSource = {
+                        showMusicSources = false
+                        musicFolderPicker.launch(null)
+                    },
+                    strings = strings
+                )
+            }
+
+            if (isFirstLaunch) {
+                FirstLaunchLanguageDialog(
+                    viewModel = viewModel,
+                    onDismiss = {
+                        viewModel.completeFirstLaunch()
+                    },
+                    strings = strings
+                )
+            }
+
             // Scaffolding content
             Scaffold(
                 containerColor = Color.Transparent,
@@ -242,7 +291,11 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                         },
                         isTablet = isTablet,
                         currentTrack = currentTrack,
-                        onCoverClick = { activeTab = "Now Playing" }
+                        onCoverClick = { activeTab = strings.nowPlaying },
+                        onPreferencesClick = { showPreferences = true },
+                        onSettingsClick = { showSettings = true },
+                        onAboutClick = { showAbout = true },
+                        strings = strings
                     )
                 },
                 modifier = Modifier
@@ -270,8 +323,8 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                                     .glassCard()
                             ) {
                                 when (activeTab) {
-                                    "Browse" -> TrackBrowserView(viewModel, onAddSource = { musicFolderPicker.launch(null) })
-                                    "Favorites" -> FavoritesView(viewModel)
+                                    strings.browse -> TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, strings = strings)
+                                    strings.favorites -> FavoritesView(viewModel)
                                 }
                             }
 
@@ -295,21 +348,21 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                             label = "screen_navigation"
                         ) { currentScreen ->
                             when (currentScreen) {
-                                "Browse" -> Box(
+                                strings.browse -> Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .glassCard()
                                 ) {
-                                    TrackBrowserView(viewModel, onAddSource = { musicFolderPicker.launch(null) })
+                                    TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, strings = strings)
                                 }
-                                "Favorites" -> Box(
+                                strings.favorites -> Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .glassCard()
                                 ) {
                                     FavoritesView(viewModel)
                                 }
-                                "Now Playing" -> Box(
+                                strings.nowPlaying -> Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .glassCard()
@@ -321,14 +374,14 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
 
                         // Sliding Bottom Mini Player for Phone Layout (only shown when not on Now Playing tab and track is selected)
                         val currentTrackState by viewModel.currentTrack.collectAsState()
-                        if (activeTab != "Now Playing" && currentTrackState != null) {
+                        if (activeTab != strings.nowPlaying && currentTrackState != null) {
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
                                     .padding(bottom = 8.dp)
                                     .glassCard(borderColor = GlassCyan.copy(alpha = 0.5f))
-                                    .clickable { activeTab = "Now Playing" }
+                                    .clickable { activeTab = strings.nowPlaying }
                             ) {
                                 MiniPlayerView(viewModel)
                             }
@@ -535,9 +588,14 @@ fun GlassHeader(
     onTabSelected: (String) -> Unit,
     isTablet: Boolean,
     currentTrack: AudioTrackEntity? = null,
-    onCoverClick: () -> Unit = {}
+    onCoverClick: () -> Unit = {},
+    onPreferencesClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
+    strings: LanguageStrings
 ) {
     val context = LocalContext.current
+    var menuExpanded by remember { mutableStateOf(false) }
     val frameShape = RoundedCornerShape(24.dp)
     val coverShape = RoundedCornerShape(20.dp)
 
@@ -664,54 +722,98 @@ fun GlassHeader(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        enabled = currentTrack != null,
-                        onClick = onCoverClick
-                    ),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.MusicNote,
-                    contentDescription = null,
-                    tint = GlassCyan,
+                Row(
                     modifier = Modifier
-                        .size(26.dp)
-                        .drawBehind {
-                            drawCircle(
-                                color = GlassCyan.copy(alpha = 0.35f),
-                                radius = 18.dp.toPx()
-                            )
-                        }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "GlassPlayer",
-                        style = TextStyle(
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = Color.White,
-                            shadow = Shadow(
-                                color = GlassTextGlow,
-                                offset = Offset(0f, 0f),
-                                blurRadius = 12f
-                            )
+                        .weight(1f)
+                        .clickable(
+                            enabled = currentTrack != null,
+                            onClick = onCoverClick
                         ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MusicNote,
+                        contentDescription = null,
+                        tint = GlassCyan,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .drawBehind {
+                                drawCircle(
+                                    color = GlassCyan.copy(alpha = 0.35f),
+                                    radius = 18.dp.toPx()
+                                )
+                            }
                     )
-                    Text(
-                        text = "By Prosper Sasuu",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.6.sp,
-                        color = GlassCyan.copy(alpha = 0.9f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "GlassPlayer",
+                            style = TextStyle(
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = Color.White,
+                                shadow = Shadow(
+                                    color = GlassTextGlow,
+                                    offset = Offset(0f, 0f),
+                                    blurRadius = 12f
+                                )
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "By Prosper Sasuu",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.6.sp,
+                            color = GlassCyan.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Menu,
+                            contentDescription = strings.settings,
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        modifier = Modifier
+                            .background(Color(0xE611122B))
+                            .border(1.dp, GlassCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(strings.preferences, color = Color.White) },
+                            onClick = {
+                                menuExpanded = false
+                                onPreferencesClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(strings.settings, color = Color.White) },
+                            onClick = {
+                                menuExpanded = false
+                                onSettingsClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(strings.about, color = Color.White) },
+                            onClick = {
+                                menuExpanded = false
+                                onAboutClick()
+                            }
+                        )
+                    }
                 }
             }
 
@@ -721,9 +823,9 @@ fun GlassHeader(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val tabs = if (isTablet) {
-                    listOf("Browse", "Favorites")
+                    listOf(strings.browse, strings.favorites)
                 } else {
-                    listOf("Browse", "Now Playing", "Favorites")
+                    listOf(strings.browse, strings.nowPlaying, strings.favorites)
                 }
                 tabs.forEach { tab ->
                     val isSelected = activeTab == tab
@@ -766,7 +868,7 @@ fun GlassHeader(
 }
 
 @Composable
-fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit) {
+fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings: LanguageStrings) {
     val context = LocalContext.current
     val tracks by viewModel.allTracks.collectAsState()
     val allTracksRaw by viewModel.allTracksIncludingBlacklisted.collectAsState()
@@ -1970,7 +2072,8 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit) {
         MusicSourcesDialog(
             viewModel = viewModel,
             onDismiss = { showSourcesDialog = false },
-            onAddSource = onAddSource
+            onAddSource = onAddSource,
+            strings = strings
         )
     }
 }
@@ -5052,7 +5155,8 @@ private fun nextMood(current: String): String {
 fun MusicSourcesDialog(
     viewModel: AudioViewModel,
     onDismiss: () -> Unit,
-    onAddSource: () -> Unit
+    onAddSource: () -> Unit,
+    strings: LanguageStrings
 ) {
     val importedFolders by viewModel.importedMusicFolders.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -5064,13 +5168,13 @@ fun MusicSourcesDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.LibraryMusic, null, tint = GlassCyan)
                 Spacer(Modifier.width(12.dp))
-                Text("Music Sources", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(strings.musicSources, color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "GlassPlayer scans these folders for audio files. You can add multiple folders from your device or SD card.",
+                    strings.sourcesDesc,
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 13.sp
                 )
@@ -5127,7 +5231,7 @@ fun MusicSourcesDialog(
                 ) {
                     Icon(Icons.Rounded.Add, null, tint = GlassCyan)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add Folder", color = Color.White)
+                    Text(strings.addFolder, color = Color.White)
                 }
 
                 if (importedFolders.isNotEmpty()) {
@@ -5140,13 +5244,413 @@ fun MusicSourcesDialog(
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), color = GlassCyan, strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text("Rescan All Folders", color = GlassCyan)
+                        Text(strings.rescanAll, color = GlassCyan)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done", color = GlassCyan) }
+            TextButton(onClick = onDismiss) { Text(strings.done, color = GlassCyan) }
+        },
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
+    )
+}
+
+@Composable
+fun PreferencesDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, strings: LanguageStrings) {
+    val selectedThemeName by viewModel.colorTheme.collectAsState()
+    val crossfade by viewModel.crossfadeSec.collectAsState()
+    val pitch by viewModel.pitchSemitones.collectAsState()
+    val sleepFade by viewModel.sleepFadeEnabled.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.preferences, color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Theme Selection
+                Column {
+                    Text(strings.colorTheme, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GlassTheme.values().forEach { theme ->
+                            val isSelected = theme.name == selectedThemeName
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) GlassCyan.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f))
+                                    .border(1.dp, if (isSelected) GlassCyan.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.setColorTheme(theme) }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("${theme.emoji} ${theme.displayName}", color = Color.White, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+
+                // Audio Settings
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(strings.crossfade, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("${crossfade.toInt()}s", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                    }
+                    Slider(
+                        value = crossfade,
+                        onValueChange = { viewModel.setCrossfade(it) },
+                        valueRange = 0f..10f,
+                        steps = 9,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = GlassCyan,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                        )
+                    )
+                }
+
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(strings.pitchShift, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("${String.format(Locale.ROOT, "%.1f", pitch)} st", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                    }
+                    Slider(
+                        value = pitch,
+                        onValueChange = { viewModel.setPitchSemitones(it) },
+                        valueRange = -6f..6f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = GlassMagenta,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                        )
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(strings.sleepTimerFade, color = Color.White, fontWeight = FontWeight.Medium)
+                        Text(strings.smoothFadeDesc, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                    }
+                    Switch(
+                        checked = sleepFade,
+                        onCheckedChange = { viewModel.setSleepFadeEnabled(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = GlassCyan,
+                            uncheckedThumbColor = Color.White.copy(alpha = 0.4f),
+                            uncheckedTrackColor = Color.White.copy(alpha = 0.1f)
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.close, color = GlassCyan, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
+    )
+}
+
+@Composable
+fun SettingsDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, onManageSources: () -> Unit, strings: LanguageStrings) {
+    val context = LocalContext.current
+    val lastFmUser by viewModel.lastFmUsername.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.settings, color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Last.fm
+                Column {
+                    Text(strings.lastFmScrobbling, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .padding(16.dp)
+                    ) {
+                        if (lastFmUser.isEmpty()) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    strings.lastFmDesc,
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = {
+                                        Toast.makeText(context, "Last.fm Login dialog not implemented in this version", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = GlassMagenta.copy(alpha = 0.3f)),
+                                    border = BorderStroke(1.dp, GlassMagenta.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(strings.connectLastFm, color = Color.White)
+                                }
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.AccountCircle, null, tint = GlassMagenta, modifier = Modifier.size(32.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(strings.loggedIn, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                                    Text(lastFmUser, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                                TextButton(onClick = { viewModel.logoutLastFm() }) {
+                                    Text(strings.logout, color = Color(0xFFFF6B6B))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Language
+                Column {
+                    Text(strings.appLanguage, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LanguageSelector(viewModel = viewModel)
+                }
+
+                // Library
+                Column {
+                    Text(strings.musicLibrary, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onManageSources,
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, GlassCyan.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Rounded.LibraryMusic, null, tint = GlassCyan, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(strings.manageFolders, color = Color.White)
+                    }
+                }
+
+                // Backup
+                Column {
+                    Text(strings.backupRestore, color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.exportBackup { json ->
+                                    println("BACKUP_EXPORT: $json")
+                                    Toast.makeText(context, "Backup JSON printed to console", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Rounded.Backup, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.export, color = Color.White)
+                        }
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Import Backup feature coming soon", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Rounded.Restore, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.import, color = Color.White)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.close, color = GlassCyan, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
+    )
+}
+
+@Composable
+fun AboutDialog(onDismiss: () -> Unit, strings: LanguageStrings) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.about, color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(GlassCyan.copy(alpha = 0.3f), GlassMagenta.copy(alpha = 0.3f))
+                            )
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.MusicNote, null, tint = GlassCyan, modifier = Modifier.size(48.dp))
+                }
+                
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("GlassPlayer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                    Text("${strings.version} 1.2.1", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+
+                Text(
+                    strings.aboutDesc,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+
+                Divider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(strings.developedBy, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                    Text("Prosper Sasuu", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text("prospersasuu808@gmail.com", color = GlassCyan.copy(alpha = 0.7f), fontSize = 12.sp)
+                }
+
+                Text(
+                    "© 2026 GlassPlayer Project",
+                    color = Color.White.copy(alpha = 0.3f),
+                    fontSize = 10.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.close, color = GlassCyan, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
+    )
+}
+
+@Composable
+fun LanguageSelector(viewModel: AudioViewModel) {
+    val currentLang by viewModel.appLanguage.collectAsState()
+    val languages = listOf("English", "Spanish", "French", "German", "Chinese", "Japanese", "Korean", "Russian", "Portuguese", "Italian")
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        languages.forEach { lang ->
+            val isSelected = lang == currentLang
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) GlassCyan.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f))
+                    .border(1.dp, if (isSelected) GlassCyan.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                    .clickable { viewModel.setAppLanguage(lang) }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(lang, color = Color.White, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun FirstLaunchLanguageDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, strings: LanguageStrings) {
+    AlertDialog(
+        onDismissRequest = { /* Force selection */ },
+        title = { 
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Language, null, tint = GlassCyan, modifier = Modifier.size(48.dp))
+                Spacer(Modifier.height(12.dp))
+                Text(strings.selectLanguage, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    strings.welcomeDesc,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    fontSize = 14.sp
+                )
+                
+                LanguageSelector(viewModel = viewModel)
+                
+                Text(
+                    strings.changeLaterDesc,
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 11.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GlassCyan.copy(alpha = 0.3f)),
+                border = BorderStroke(1.dp, GlassCyan.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(strings.continueBtn, color = Color.White, fontWeight = FontWeight.Bold)
+            }
         },
         containerColor = Color(0xFF111329),
         shape = RoundedCornerShape(28.dp),
