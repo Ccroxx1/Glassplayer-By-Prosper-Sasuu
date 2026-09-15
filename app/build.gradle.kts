@@ -5,6 +5,7 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
+  id("com.google.gms.google-services")
 }
 
 android {
@@ -20,7 +21,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 4
-        versionName = "v1.2.1"
+        versionName = "v1.2.2"
 
       val localProperties = Properties()
       val localPropertiesFile = project.rootProject.file("local.properties")
@@ -116,4 +117,8 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
+  implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+  implementation("com.google.firebase:firebase-auth")
+  implementation("com.google.firebase:firebase-firestore")
+  implementation("com.google.firebase:firebase-analytics")
 }

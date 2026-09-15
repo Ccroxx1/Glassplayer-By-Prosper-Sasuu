@@ -19,3 +19,7 @@ debug.keystore
 
 .idea/
 gradle/gradle-daemon-jvm.properties
+
+# Local/private files
+google-services.json
+hs_err_pid*.log

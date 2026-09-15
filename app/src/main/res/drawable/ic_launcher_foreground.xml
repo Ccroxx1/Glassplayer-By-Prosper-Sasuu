@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Center the logo artwork inside the safe area -->
+    <!-- We apply scaling to keep the glow within the safe zone (72dp) -->
     <item
-        android:drawable="@drawable/img_app_icon_1784343634612"
+        android:width="82dp"
+        android:height="82dp"
+        android:drawable="@drawable/ic_launcher_image"
         android:gravity="center" />
 </layer-list>

@@ -2032,7 +2032,7 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
     if (showBulkDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showBulkDeleteDialog = false },
-            title = { Text("Delete selected songs?", color = Color.White) },
+            title = { Text("Delete selected songs?", color = Color.White, fontWeight = FontWeight.Bold) },
             text = { Text("These files will be permanently deleted from your device.", color = Color.White.copy(alpha = 0.75f)) },
             confirmButton = {
                 TextButton(onClick = {
@@ -2042,11 +2042,12 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                     }
                     showBulkDeleteDialog = false
                     selection.exit()
-                }) { Text("Delete", color = Color(0xFFFF6B6B)) }
+                }) { Text("Delete", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { showBulkDeleteDialog = false }) { Text("Cancel", color = GlassCyan) } },
             containerColor = Color(0xFF111329),
-            shape = RoundedCornerShape(22.dp)
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
         )
     }
 
@@ -2276,11 +2277,12 @@ private fun AddTracksToPlaylistDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { if (newName.isNotBlank()) { onCreatePlaylistInline(newName.trim()); newName = "" } }) { Text("Create", color = GlassCyan) }
+            TextButton(onClick = { if (newName.isNotBlank()) { onCreatePlaylistInline(newName.trim()); newName = "" } }) { Text("Create", color = GlassCyan, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.White.copy(alpha = 0.7f)) } },
         containerColor = Color(0xFF111329),
-        shape = RoundedCornerShape(22.dp)
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
     )
 }
 
@@ -2590,7 +2592,7 @@ private fun SongActionsDropdown(
                         Color(0xFF0D0E22).copy(alpha = 0.96f)
                     )
                 ),
-                shape = RoundedCornerShape(18.dp)
+                shape = RoundedCornerShape(24.dp)
             )
             .border(
                 width = 1.dp,
@@ -2601,9 +2603,9 @@ private fun SongActionsDropdown(
                         GlassMagenta.copy(alpha = 0.35f)
                     )
                 ),
-                shape = RoundedCornerShape(18.dp)
+                shape = RoundedCornerShape(24.dp)
             ),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(24.dp),
         containerColor = Color.Transparent,
         tonalElevation = 6.dp,
         shadowElevation = 12.dp
@@ -2882,7 +2884,7 @@ private fun FileInfoDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("File info", color = Color.White) },
+        title = { Text("File info", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             Text(
                 text = infoText,
@@ -2892,10 +2894,12 @@ private fun FileInfoDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = GlassCyan)
+                Text("Close", color = GlassCyan, fontWeight = FontWeight.Bold)
             }
         },
-        containerColor = Color(0xFF0F1026)
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
     )
 }
 
@@ -3094,7 +3098,8 @@ fun CreatePlaylistDialog(
                 Text("Cancel", color = Color.White.copy(alpha = 0.6f))
             }
         },
-        containerColor = Color(0xFF0F1026),
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
     )
 }
@@ -3174,7 +3179,8 @@ fun EditTagsDialog(
                 Text("Cancel", color = Color.White.copy(alpha = 0.6f))
             }
         },
-        containerColor = Color(0xFF0F1026),
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
     )
 }
@@ -3315,7 +3321,8 @@ fun AddTrackToPlaylistDialog(
                 Text("Cancel", color = Color.White.copy(alpha = 0.6f))
             }
         },
-        containerColor = Color(0xFF0F1026),
+        containerColor = Color(0xFF111329),
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier.border(1.dp, GlassBorderWhite, RoundedCornerShape(28.dp))
     )
 }
@@ -5543,7 +5550,7 @@ fun AboutDialog(onDismiss: () -> Unit, strings: LanguageStrings) {
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("GlassPlayer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                    Text("${strings.version} 1.2.1", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("${strings.version} 1.2.2", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
 
                 Text(
@@ -5583,7 +5590,7 @@ fun AboutDialog(onDismiss: () -> Unit, strings: LanguageStrings) {
 @Composable
 fun LanguageSelector(viewModel: AudioViewModel) {
     val currentLang by viewModel.appLanguage.collectAsState()
-    val languages = listOf("English", "Spanish", "French", "German", "Chinese", "Japanese", "Korean", "Russian", "Portuguese", "Italian")
+    val languages = listOf("English", "Spanish", "French")
     
     Row(
         modifier = Modifier
