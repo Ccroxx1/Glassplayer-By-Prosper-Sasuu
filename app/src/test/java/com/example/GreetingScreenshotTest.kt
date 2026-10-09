@@ -33,7 +33,12 @@ class GreetingScreenshotTest {
           GlassHeader(
             activeTab = "Browse",
             onTabSelected = {},
+<<<<<<< HEAD
+            isTablet = false,
+            strings = Localization.getStrings("en")
+=======
             isTablet = false
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
           )
         }
       }

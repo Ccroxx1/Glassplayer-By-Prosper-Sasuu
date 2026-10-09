@@ -47,5 +47,26 @@ data class PlaylistEntity(
 @Entity(tableName = "playlist_track_cross_ref", primaryKeys = ["playlistId", "trackId"])
 data class PlaylistTrackCrossRefEntity(
     val playlistId: Int,
+<<<<<<< HEAD
+    val trackId: Int,
+    val position: Int = 0
+)
+
+/** Reliable equality helper to check if two tracks represent the same song regardless of database status. */
+fun AudioTrackEntity.isSameTrack(other: AudioTrackEntity?): Boolean {
+    if (other == null) return false
+    if (this.id > 0 && other.id > 0) {
+        return this.id == other.id
+    }
+    if (this.uri.isNotBlank() && other.uri.isNotBlank()) {
+        return this.uri == other.uri
+    }
+    if (this.category.isNotBlank() && other.category.isNotBlank() && this.category != "Library") {
+        return this.category == other.category
+    }
+    return this.title.equals(other.title, ignoreCase = true) && this.artist.equals(other.artist, ignoreCase = true)
+}
+=======
     val trackId: Int
 )
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e

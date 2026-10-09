@@ -1,8 +1,17 @@
 package com.example
 
+<<<<<<< HEAD
+import android.util.Log
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+=======
+import androidx.room.withTransaction
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 import java.util.Calendar
 
 class AudioRepository(
@@ -27,9 +36,20 @@ class AudioRepository(
         val unmatchedCount: Int
     )
 
+<<<<<<< HEAD
+    private val playlistMutex = Mutex()
+
+    val allTracks: Flow<List<AudioTrackEntity>> = audioDao.getAllTracks()
+    val favorites: Flow<List<AudioTrackEntity>> = audioDao.getFavoriteTracks()
+    val recentTracks: Flow<List<AudioTrackEntity>> =
+        audioDao.getRecentTracks7Days(System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L)
+    val recentYouTubeTracks: Flow<List<AudioTrackEntity>> =
+        audioDao.getRecentYouTubeTracks7Days(System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L)
+=======
     val allTracks: Flow<List<AudioTrackEntity>> = audioDao.getAllTracks()
     val favorites: Flow<List<AudioTrackEntity>> = audioDao.getFavoriteTracks()
     val recentTracks: Flow<List<AudioTrackEntity>> = audioDao.getRecentTracks()
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     val recentlyAddedTracks: Flow<List<AudioTrackEntity>> = audioDao.getRecentlyAddedTracks()
     val mostPlayedTracks: Flow<List<AudioTrackEntity>> = audioDao.getMostPlayedTracks()
     val allPlaylists: Flow<List<PlaylistEntity>> = audioDao.getAllPlaylists()
@@ -50,6 +70,65 @@ class AudioRepository(
 
     suspend fun getTrackByUri(uri: String): AudioTrackEntity? = audioDao.getTrackByUri(uri)
 
+<<<<<<< HEAD
+    private suspend fun findExistingTrack(track: AudioTrackEntity): AudioTrackEntity? {
+        val ytId = track.youtubeVideoId()
+        if (ytId != null) {
+            audioDao.getTrackByUri(youtubeTrackUri(ytId))?.let { return it }
+            audioDao.getTrackByCategory("$YOUTUBE_CATEGORY_PREFIX$ytId")?.let { return it }
+        }
+        if (track.uri.isNotBlank()) {
+            audioDao.getTrackByUri(track.uri)?.let { return it }
+        }
+        if (track.id > 0) {
+            audioDao.getTrackById(track.id)?.let { return it }
+        }
+        return null
+    }
+
+    /**
+     * Find-or-create a library row. YouTube identity is always `youtube://VIDEO_ID`.
+     * Never persists a blank URI. Never trusts a caller-supplied (including negative) id.
+     */
+    suspend fun upsertTrack(track: AudioTrackEntity): Long {
+        val normalized = track.normalizedForPersistence()
+        if (normalized == null) {
+            Log.w(TAG, "Refusing to persist track without a stable URI: title=${track.title}")
+            return -1L
+        }
+        val existing = findExistingTrack(normalized) ?: findExistingTrack(track)
+        return if (existing != null) {
+            audioDao.updateTrackIdentityAndMetadata(
+                id = existing.id,
+                uri = when {
+                    normalized.uri.startsWith(YOUTUBE_URI_PREFIX) -> normalized.uri
+                    existing.uri.isNotBlank() -> existing.uri
+                    else -> normalized.uri
+                },
+                title = normalized.title.ifBlank { existing.title },
+                artist = normalized.artist.ifBlank { existing.artist },
+                durationMs = if (normalized.durationMs > 0) normalized.durationMs else existing.durationMs,
+                album = normalized.album.ifBlank { existing.album },
+                folderName = normalized.folderName.ifBlank { existing.folderName },
+                albumArtUri = normalized.albumArtUri ?: existing.albumArtUri,
+                category = normalized.category.ifBlank { existing.category },
+                dateAdded = existing.dateAdded.takeIf { it > 0L } ?: normalized.dateAdded,
+                dateModified = normalized.dateModified,
+                year = normalized.year
+            )
+            existing.id.toLong()
+        } else {
+            val inserted = audioDao.insertTrack(normalized.copy(id = 0))
+            if (inserted > 0L) {
+                inserted
+            } else {
+                findExistingTrack(normalized)?.id?.toLong() ?: -1L
+            }
+        }
+    }
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     /** Returns tracks for [uris] in the same order as requested (missing URIs omitted). */
     suspend fun getTracksByUrisOrdered(uris: List<String>): List<AudioTrackEntity> {
         if (uris.isEmpty()) return emptyList()
@@ -57,6 +136,8 @@ class AudioRepository(
         return uris.mapNotNull { found[it] }
     }
 
+<<<<<<< HEAD
+=======
     suspend fun upsertTrack(track: AudioTrackEntity): Long {
         val existing = audioDao.getTrackByUri(track.uri)
         return if (existing != null) {
@@ -79,6 +160,7 @@ class AudioRepository(
         }
     }
 
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     suspend fun insertTrack(track: AudioTrackEntity): Long = upsertTrack(track)
 
     /** Single Room transaction so the UI gets one Flow emit instead of one per track. */
@@ -222,6 +304,243 @@ class AudioRepository(
     }
 
     suspend fun createPlaylist(name: String): Long {
+<<<<<<< HEAD
+        return playlistMutex.withLock {
+            audioDao.insertPlaylist(PlaylistEntity(name = name))
+        }
+    }
+
+    suspend fun deletePlaylist(playlistId: Int) {
+        playlistMutex.withLock {
+            database.withTransaction {
+                audioDao.deleteCrossRefsForPlaylist(playlistId)
+                audioDao.deletePlaylist(playlistId)
+            }
+        }
+    }
+
+    suspend fun addTrackToPlaylist(playlistId: Int, trackId: Int) {
+        if (playlistId <= 0 || trackId <= 0) return
+        playlistMutex.withLock {
+            addTrackIdToPlaylistInternal(playlistId, trackId)
+        }
+    }
+
+    /**
+     * Find-or-create [track], then attach it to [playlistId] using the real Room id.
+     * Duplicate membership in the same playlist is ignored.
+     */
+    suspend fun addTrackEntityToPlaylist(playlistId: Int, track: AudioTrackEntity): PlaylistAddResult {
+        if (playlistId <= 0) return PlaylistAddResult.FAILED
+        return playlistMutex.withLock {
+            try {
+                database.withTransaction {
+                    addTrackEntityToPlaylistInternal(playlistId, track)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add track to playlist $playlistId", e)
+                PlaylistAddResult.FAILED
+            }
+        }
+    }
+
+    suspend fun createPlaylistWithTrack(name: String, track: AudioTrackEntity): Pair<Int, PlaylistAddResult> {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return 0 to PlaylistAddResult.FAILED
+        return playlistMutex.withLock {
+            try {
+                database.withTransaction {
+                    val playlistId = audioDao.insertPlaylist(PlaylistEntity(name = trimmed)).toInt()
+                    if (playlistId <= 0) {
+                        0 to PlaylistAddResult.FAILED
+                    } else {
+                        playlistId to addTrackEntityToPlaylistInternal(playlistId, track)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to create playlist with track", e)
+                0 to PlaylistAddResult.FAILED
+            }
+        }
+    }
+
+    suspend fun createPlaylistWithTracks(name: String, tracks: Collection<AudioTrackEntity>): Pair<Int, Int> {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return 0 to 0
+        return playlistMutex.withLock {
+            try {
+                database.withTransaction {
+                    val playlistId = audioDao.insertPlaylist(PlaylistEntity(name = trimmed)).toInt()
+                    if (playlistId <= 0) return@withTransaction 0 to 0
+                    var added = 0
+                    tracks.forEach { track ->
+                        if (addTrackEntityToPlaylistInternal(playlistId, track) == PlaylistAddResult.ADDED) {
+                            added++
+                        }
+                    }
+                    playlistId to added
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to create playlist with tracks", e)
+                0 to 0
+            }
+        }
+    }
+
+    suspend fun importYouTubePlaylist(
+        onlinePlaylist: OnlinePlaylistResult,
+        customName: String? = null
+    ): Pair<Int, Int> {
+        val playlistName = (customName ?: onlinePlaylist.title).trim().ifBlank { "YouTube Playlist" }
+        return playlistMutex.withLock {
+            try {
+                database.withTransaction {
+                    val existingPlaylists = audioDao.getAllPlaylistsSnapshot()
+                    val targetPlaylist = existingPlaylists.firstOrNull {
+                        it.name.equals(playlistName, ignoreCase = true)
+                    }
+                    val playlistId = targetPlaylist?.id ?: audioDao.insertPlaylist(
+                        PlaylistEntity(name = playlistName)
+                    ).toInt()
+
+                    if (playlistId <= 0) return@withTransaction 0 to 0
+
+                    var importedCount = 0
+                    onlinePlaylist.tracks.forEachIndexed { index, onlineTrack ->
+                        val trackEntity = onlineTrack.toAudioTrackEntity(index)
+                        val realTrackId = upsertTrack(trackEntity).toInt()
+                        if (realTrackId > 0) {
+                            if (!audioDao.isTrackInPlaylist(playlistId, realTrackId)) {
+                                val nextPos = audioDao.getMaxPlaylistPosition(playlistId) + 1
+                                audioDao.insertPlaylistTrackCrossRef(
+                                    PlaylistTrackCrossRefEntity(
+                                        playlistId = playlistId,
+                                        trackId = realTrackId,
+                                        position = nextPos
+                                    )
+                                )
+                                importedCount++
+                            }
+                        }
+                    }
+                    playlistId to importedCount
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to import YouTube playlist ${onlinePlaylist.playlistId}", e)
+                0 to 0
+            }
+        }
+    }
+
+    private suspend fun addTrackEntityToPlaylistInternal(
+        playlistId: Int,
+        track: AudioTrackEntity
+    ): PlaylistAddResult {
+        val playlist = audioDao.getPlaylistById(playlistId)
+        if (playlist == null) {
+            Log.w(TAG, "Playlist $playlistId does not exist")
+            return PlaylistAddResult.FAILED
+        }
+        val realTrackId = upsertTrack(track).toInt()
+        if (realTrackId <= 0) {
+            Log.w(TAG, "Could not persist track for playlist: ${track.title}")
+            return PlaylistAddResult.FAILED
+        }
+        val confirmed = audioDao.getTrackById(realTrackId)
+        if (confirmed == null) {
+            Log.w(TAG, "Persisted track id $realTrackId was not found")
+            return PlaylistAddResult.FAILED
+        }
+        return addTrackIdToPlaylistInternal(playlistId, realTrackId)
+    }
+
+    private suspend fun addTrackIdToPlaylistInternal(playlistId: Int, trackId: Int): PlaylistAddResult {
+        if (audioDao.isTrackInPlaylist(playlistId, trackId)) {
+            return PlaylistAddResult.ALREADY_IN_PLAYLIST
+        }
+        val nextPosition = audioDao.getMaxPlaylistPosition(playlistId) + 1
+        val rowId = audioDao.insertPlaylistTrackCrossRef(
+            PlaylistTrackCrossRefEntity(playlistId = playlistId, trackId = trackId, position = nextPosition)
+        )
+        return when {
+            rowId > 0L -> PlaylistAddResult.ADDED
+            audioDao.isTrackInPlaylist(playlistId, trackId) -> PlaylistAddResult.ALREADY_IN_PLAYLIST
+            else -> {
+                Log.w(TAG, "Cross-ref insert failed for playlist=$playlistId track=$trackId")
+                PlaylistAddResult.FAILED
+            }
+        }
+    }
+
+    suspend fun clearRecentYouTubeHistory() {
+        audioDao.clearRecentYouTubeHistory()
+    }
+
+    suspend fun cleanInvalidData() {
+        try {
+            database.withTransaction {
+                val sevenDaysAgoMs = System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L
+                audioDao.expireOldRecentHistory(sevenDaysAgoMs)
+                repairOnlineTrackIdentities()
+                audioDao.deleteInvalidEmptyUriTracks()
+                audioDao.deleteOrphanCrossRefs()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Data cleanup failed", e)
+        }
+    }
+
+    /**
+     * Repair historical YouTube rows that used a blank or stream URI, merging duplicates
+     * that share the same video id so playlist membership is preserved.
+     */
+    private suspend fun repairOnlineTrackIdentities() {
+        val all = audioDao.getAllTracksSnapshot()
+        val groups = all.groupBy { track ->
+            track.youtubeVideoId()
+        }
+        groups.forEach { (identity, tracks) ->
+            if (identity.isNullOrBlank()) {
+                tracks.filter { it.uri.isBlank() && it.folderName == FOLDER_YOUTUBE }
+                    .forEach { broken ->
+                        audioDao.deleteCrossRefsForTrack(broken.id)
+                        audioDao.deleteTrackById(broken.id)
+                    }
+                return@forEach
+            }
+            val keeper = tracks.maxWithOrNull(
+                compareBy<AudioTrackEntity> { if (it.uri.startsWith(YOUTUBE_URI_PREFIX)) 1 else 0 }
+                    .thenBy { if (!it.albumArtUri.isNullOrBlank()) 1 else 0 }
+                    .thenBy { it.id }
+            ) ?: return@forEach
+            val normalized = keeper.normalizedForPersistence() ?: return@forEach
+            audioDao.updateTrackIdentityAndMetadata(
+                id = keeper.id,
+                uri = normalized.uri,
+                title = keeper.title,
+                artist = keeper.artist,
+                durationMs = keeper.durationMs,
+                album = normalized.album,
+                folderName = normalized.folderName,
+                albumArtUri = normalized.albumArtUri ?: keeper.albumArtUri,
+                category = normalized.category,
+                dateAdded = keeper.dateAdded,
+                dateModified = keeper.dateModified,
+                year = keeper.year
+            )
+            tracks.filter { it.id != keeper.id }.forEach { duplicate ->
+                audioDao.getCrossRefsForTrack(duplicate.id).forEach { ref ->
+                    if (!audioDao.isTrackInPlaylist(ref.playlistId, keeper.id)) {
+                        audioDao.insertPlaylistTrackCrossRef(
+                            PlaylistTrackCrossRefEntity(ref.playlistId, keeper.id, ref.position)
+                        )
+                    }
+                    audioDao.deletePlaylistTrackCrossRef(ref.playlistId, duplicate.id)
+                }
+                audioDao.deleteTrackById(duplicate.id)
+            }
+        }
+=======
         return audioDao.insertPlaylist(PlaylistEntity(name = name))
     }
 
@@ -232,6 +551,7 @@ class AudioRepository(
 
     suspend fun addTrackToPlaylist(playlistId: Int, trackId: Int) {
         audioDao.insertPlaylistTrackCrossRef(PlaylistTrackCrossRefEntity(playlistId, trackId))
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     }
 
     suspend fun removeTrackFromPlaylist(playlistId: Int, trackId: Int) {
@@ -297,6 +617,10 @@ class AudioRepository(
     }
 
     companion object {
+<<<<<<< HEAD
+        private const val TAG = "AudioRepository"
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         const val SYNTH_URI = "procedural://synth"
         val SYNTH_LYRICS = """
             [Neon Pulse]

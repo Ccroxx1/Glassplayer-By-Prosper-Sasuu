@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+@file:OptIn(UnstableApi::class)
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 package com.example
 
 import android.app.PendingIntent
@@ -13,6 +18,10 @@ import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+<<<<<<< HEAD
+import android.os.PowerManager
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -24,6 +33,10 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+<<<<<<< HEAD
+import androidx.media3.common.util.UnstableApi
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,9 +50,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+<<<<<<< HEAD
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.ln
+import kotlin.math.max
+import kotlin.math.sin
+=======
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
 enum class RepeatMode {
     OFF,
@@ -62,12 +85,44 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+<<<<<<< HEAD
+    data class PlaybackProgress(
+        val position: Long = 0L,
+        val duration: Long = 0L,
+        val isPlaying: Boolean = false
+    )
+
+    private val _playbackProgress = MutableStateFlow(PlaybackProgress())
+    val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     private val _playbackPosition = MutableStateFlow(0L)
     val playbackPosition: StateFlow<Long> = _playbackPosition.asStateFlow()
 
     private val _playbackDuration = MutableStateFlow(0L)
     val playbackDuration: StateFlow<Long> = _playbackDuration.asStateFlow()
 
+<<<<<<< HEAD
+    private fun publishPosition(
+        position: Long = _playbackPosition.value,
+        duration: Long = _playbackDuration.value,
+        isPlaying: Boolean = _isPlaying.value
+    ) {
+        val safePos = position.coerceAtLeast(0L)
+        _playbackPosition.value = safePos
+        if (duration > 0 && duration != C.TIME_UNSET) {
+            _playbackDuration.value = duration
+        }
+        _playbackProgress.value = PlaybackProgress(
+            position = safePos,
+            duration = _playbackDuration.value,
+            isPlaying = isPlaying
+        )
+    }
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     private val _isShuffleEnabled = MutableStateFlow(false)
     val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
 
@@ -77,6 +132,13 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private val _activeQueue = MutableStateFlow<List<AudioTrackEntity>>(emptyList())
     val activeQueue: StateFlow<List<AudioTrackEntity>> = _activeQueue.asStateFlow()
 
+<<<<<<< HEAD
+    private var originalQueue: List<AudioTrackEntity> = emptyList()
+    private var shuffledQueue: List<AudioTrackEntity> = emptyList()
+    private var shuffleIndex: Int = -1
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     private val _waveformAmplitudes = MutableStateFlow(List(24) { 0.1f })
     val waveformAmplitudes: StateFlow<List<Float>> = _waveformAmplitudes.asStateFlow()
 
@@ -155,6 +217,21 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
+<<<<<<< HEAD
+            val current = _currentTrack.value
+            if (current != null && (current.isYouTubeTrack() || current.uri == AudioRepository.SYNTH_URI)) return
+            val player = exoPlayer ?: return
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            val dur = player.duration
+            Log.d(
+                tag,
+                "LOCAL PLAYER onPlaybackStateChanged: isPlaying=${player.isPlaying} currentPosition=$pos duration=$dur playbackState=$playbackState mediaItem=${player.currentMediaItem?.mediaId}"
+            )
+            when (playbackState) {
+                Player.STATE_READY -> {
+                    val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else _playbackDuration.value
+                    publishPosition(position = pos, duration = validDur, isPlaying = player.isPlaying)
+=======
             val player = exoPlayer ?: return
             when (playbackState) {
                 Player.STATE_READY -> {
@@ -162,6 +239,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     if (dur > 0 && dur != C.TIME_UNSET) {
                         _playbackDuration.value = dur
                     }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     attachAudioEffects(player.audioSessionId)
                     // Resume only when the user still wants play and we are not paused for a call/focus loss
                     if (userWantsPlaying && !pausedByTransientFocusLoss && !player.isPlaying && hasAudioFocus) {
@@ -171,27 +249,71 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     updateSessionMetadata(_currentTrack.value ?: return)
                     updateSessionState()
                 }
+<<<<<<< HEAD
+                Player.STATE_BUFFERING -> {
+                    updateSessionState()
+                }
                 Player.STATE_ENDED -> {
+                    _isPlaying.value = false
+                    stopVisualizer()
+                    progressJob?.cancel()
+                    val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else _playbackDuration.value
+                    publishPosition(position = validDur, duration = validDur, isPlaying = false)
+=======
+                Player.STATE_ENDED -> {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     // Only handle completion if the playlist is empty or we reached the end
                     if (player.mediaItemCount <= 1 || player.nextMediaItemIndex == C.INDEX_UNSET) {
                         onTrackCompleted()
                     }
+<<<<<<< HEAD
+                    updateSessionState()
+                }
+                Player.STATE_IDLE -> {
+                    _isPlaying.value = false
+                    stopVisualizer()
+                    progressJob?.cancel()
+                    publishPosition(position = pos, duration = _playbackDuration.value, isPlaying = false)
+                    updateSessionState()
+                }
+=======
                 }
                 else -> Unit
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+<<<<<<< HEAD
+            val current = _currentTrack.value
+            if (current != null && (current.isYouTubeTrack() || current.uri == AudioRepository.SYNTH_URI)) return
             val player = exoPlayer ?: return
             val trackId = mediaItem?.mediaId?.toIntOrNull() ?: return
             val track = _activeQueue.value.find { it.id == trackId } ?: return
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            val dur = player.duration
+            val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else track.durationMs
+
+            Log.d(tag, "Local onMediaItemTransition: track=${track.title}, reason=$reason, pos=$pos, dur=$validDur")
+=======
+            val player = exoPlayer ?: return
+            val trackId = mediaItem?.mediaId?.toIntOrNull() ?: return
+            val track = _activeQueue.value.find { it.id == trackId } ?: return
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                 // Gapless auto-transition
                 _currentTrack.value = track
+<<<<<<< HEAD
+                if (_isShuffleEnabled.value) {
+                    shuffleIndex = shuffledQueue.indexOfFirst { it.id == track.id }
+                }
+                publishPosition(position = pos, duration = validDur, isPlaying = player.isPlaying)
+=======
                 _playbackPosition.value = 0L
                 val dur = player.duration
                 _playbackDuration.value = if (dur > 0 && dur != C.TIME_UNSET) dur else track.durationMs
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 updateSessionMetadata(track)
                 updateSessionState()
                 ensureServiceRunning()
@@ -202,10 +324,101 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 if (_crossfadeSec.value <= 0f) {
                     prepareNextTrackForGapless()
                 }
+<<<<<<< HEAD
+            } else {
+                publishPosition(position = pos, duration = validDur, isPlaying = player.isPlaying)
+            }
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            val player = exoPlayer ?: return
+            val current = _currentTrack.value ?: return
+            if (current.isYouTubeTrack() || current.uri == AudioRepository.SYNTH_URI) return
+
+            Log.d(
+                tag,
+                "LOCAL PLAYER onPositionDiscontinuity: reason=$reason isPlaying=${player.isPlaying} currentPosition=${player.currentPosition} duration=${player.duration} playbackState=${player.playbackState} mediaItem=${player.currentMediaItem?.mediaId}"
+            )
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            val dur = player.duration
+            val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else _playbackDuration.value
+            publishPosition(position = pos, duration = validDur, isPlaying = player.isPlaying)
+            if (player.isPlaying) {
+                startLocalProgressTracker()
+            }
+        }
+
+        override fun onEvents(player: Player, events: Player.Events) {
+            val current = _currentTrack.value ?: return
+            if (current.isYouTubeTrack() || current.uri == AudioRepository.SYNTH_URI) return
+
+            if (events.containsAny(
+                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_IS_PLAYING_CHANGED,
+                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                Player.EVENT_POSITION_DISCONTINUITY,
+                Player.EVENT_MEDIA_ITEM_TRANSITION
+            )) {
+                val pos = player.currentPosition.coerceAtLeast(0L)
+                val dur = player.duration
+                val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else _playbackDuration.value
+                Log.d(
+                    tag,
+                    "LOCAL PLAYER onEvents: isPlaying=${player.isPlaying} currentPosition=$pos duration=$validDur playbackState=${player.playbackState} mediaItem=${player.currentMediaItem?.mediaId}"
+                )
+                publishPosition(position = pos, duration = validDur, isPlaying = player.isPlaying)
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+<<<<<<< HEAD
+            val current = _currentTrack.value
+            if (current?.uri == AudioRepository.SYNTH_URI || current?.isYouTubeTrack() == true) return
+            _isPlaying.value = isPlaying
+            Log.d(
+                tag,
+                "LOCAL PLAYER onIsPlayingChanged: isPlaying=$isPlaying currentPosition=${exoPlayer?.currentPosition} duration=${exoPlayer?.duration} playbackState=${exoPlayer?.playbackState} mediaItem=${exoPlayer?.currentMediaItem?.mediaId}"
+            )
+            if (isPlaying) {
+                pausedByTransientFocusLoss = false
+                acquireWakeLock()
+                ensureServiceRunning()
+                startLocalProgressTracker()
+                startVisualizerLoop()
+            } else {
+                releaseWakeLock()
+                stopVisualizer()
+                progressJob?.cancel()
+                exoPlayer?.let { player ->
+                    val pos = player.currentPosition.coerceAtLeast(0L)
+                    val dur = player.duration
+                    val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else _playbackDuration.value
+                    publishPosition(position = pos, duration = validDur, isPlaying = false)
+                }
+                if (userWantsPlaying && !pausedByTransientFocusLoss && exoPlayer?.playbackState == Player.STATE_IDLE) {
+                    // Recover from unexpected idle
+                    schedulePlaybackReassert()
+                }
+            }
+            updateSessionState()
+            notifySessionChanged()
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            val current = _currentTrack.value
+            if (current != null && (current.isYouTubeTrack() || current.uri == AudioRepository.SYNTH_URI)) return
+            Log.e(tag, "ExoPlayer error: ${error.message}", error)
+            _isPlaying.value = false
+            stopVisualizer()
+            progressJob?.cancel()
+            publishPosition(isPlaying = false)
+=======
             if (_currentTrack.value?.uri == AudioRepository.SYNTH_URI) return
             _isPlaying.value = isPlaying
             if (isPlaying) {
@@ -221,10 +434,42 @@ class PlayerEngine private constructor(private val appContext: Context) {
         override fun onPlayerError(error: PlaybackException) {
             Log.e(tag, "ExoPlayer error: ${error.message}", error)
             _isPlaying.value = false
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             updateSessionState()
         }
     }
 
+<<<<<<< HEAD
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun acquireWakeLock() {
+        if (wakeLock == null) {
+            val pm = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GlassPlayer:BackgroundAudio")?.apply {
+                setReferenceCounted(false)
+            }
+        }
+        try {
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire(3 * 60 * 60 * 1000L)
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "WakeLock acquire failed", e)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "WakeLock release failed", e)
+        }
+    }
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     private var reassertJob: Job? = null
 
     private fun schedulePlaybackReassert() {
@@ -241,6 +486,57 @@ class PlayerEngine private constructor(private val appContext: Context) {
      * cannot leave the player paused while the user still expects music.
      */
     fun reassertPlaybackIfNeeded() {
+<<<<<<< HEAD
+        val track = _currentTrack.value ?: return
+        val currentlyPlaying = when {
+            track.uri == AudioRepository.SYNTH_URI -> _isPlaying.value
+            track.isYouTubeTrack() -> _isPlaying.value
+            else -> exoPlayer?.isPlaying == true
+        }
+        if (currentlyPlaying) {
+            _isPlaying.value = true
+            return
+        }
+
+        if (!userWantsPlaying || pausedByTransientFocusLoss) return
+        if (!requestPlaybackFocus()) return
+
+        if (track.uri == AudioRepository.SYNTH_URI) {
+            synth.start()
+            applySynthControls()
+            _isPlaying.value = true
+            startProgressTracker(isSynth = true)
+            startVisualizerLoop()
+            ensureServiceRunning()
+            updateSessionState()
+            return
+        }
+
+        if (track.isYouTubeTrack()) {
+            _isPlaying.value = true
+            publishPosition(isPlaying = true)
+            YouTubeBridge.play()
+            ensureServiceRunning()
+            updateSessionState()
+            return
+        }
+
+        val player = exoPlayer ?: return
+        if (!player.isPlaying) {
+            if (player.playbackState == Player.STATE_IDLE) {
+                if (player.mediaItemCount == 0) {
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(Uri.parse(track.uri))
+                        .setMediaId(track.id.toString())
+                        .build()
+                    player.setMediaItem(mediaItem)
+                }
+                player.prepare()
+            } else if (player.playbackState == Player.STATE_ENDED) {
+                player.seekTo(0)
+                player.prepare()
+            }
+=======
         if (!userWantsPlaying || pausedByTransientFocusLoss) return
         val track = _currentTrack.value ?: return
         if (!requestPlaybackFocus()) return
@@ -257,14 +553,18 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
         val player = exoPlayer ?: return
         if (!player.isPlaying) {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             player.playWhenReady = true
             try {
                 player.play()
             } catch (e: Exception) {
                 Log.w(tag, "reassert play failed", e)
             }
+<<<<<<< HEAD
+=======
             _isPlaying.value = true
             startProgressTracker(isSynth = false)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             ensureServiceRunning()
             updateSessionState()
         }
@@ -312,6 +612,13 @@ class PlayerEngine private constructor(private val appContext: Context) {
             exoPlayer?.pause()
         }
         progressJob?.cancel()
+<<<<<<< HEAD
+        exoPlayer?.let { player ->
+            val validDur = if (player.duration > 0 && player.duration != C.TIME_UNSET) player.duration else _playbackDuration.value
+            publishPosition(position = player.currentPosition.coerceAtLeast(0L), duration = validDur, isPlaying = false)
+        }
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         updateSessionState()
     }
 
@@ -407,6 +714,24 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     updateSessionState()
                 }
 
+<<<<<<< HEAD
+                override fun onSetShuffleMode(shuffleMode: Int) {
+                    setShuffleEnabled(
+                        shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_ALL ||
+                        shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_GROUP
+                    )
+                }
+
+                override fun onSetRepeatMode(repeatModeInt: Int) {
+                    when (repeatModeInt) {
+                        PlaybackStateCompat.REPEAT_MODE_ONE -> setRepeatMode(RepeatMode.ONE)
+                        PlaybackStateCompat.REPEAT_MODE_ALL, PlaybackStateCompat.REPEAT_MODE_GROUP -> setRepeatMode(RepeatMode.ALL)
+                        else -> setRepeatMode(RepeatMode.OFF)
+                    }
+                }
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 override fun onMediaButtonEvent(mediaButtonEvent: Intent?): Boolean {
                     return super.onMediaButtonEvent(mediaButtonEvent)
                 }
@@ -418,6 +743,57 @@ class PlayerEngine private constructor(private val appContext: Context) {
         } catch (_: Exception) {
         }
         startVisualizerLoop()
+<<<<<<< HEAD
+        YouTubeBridge.onStateChanged = { playing ->
+            val current = _currentTrack.value
+            if (current != null && current.isYouTubeTrack()) {
+                _isPlaying.value = playing
+                publishPosition(isPlaying = playing)
+                if (playing) {
+                    userWantsPlaying = true
+                    acquireWakeLock()
+                    ensureServiceRunning()
+                    startVisualizerLoop()
+                } else {
+                    releaseWakeLock()
+                    stopVisualizer()
+                }
+                updateSessionState()
+                notifySessionChanged()
+            }
+        }
+        YouTubeBridge.onTimeUpdated = { curSec, durSec ->
+            val current = _currentTrack.value
+            if (current != null && current.isYouTubeTrack()) {
+                val pos = (curSec * 1000).toLong().coerceAtLeast(0L)
+                val dur = if (durSec > 0) (durSec * 1000).toLong() else _playbackDuration.value
+                publishPosition(position = pos, duration = dur, isPlaying = _isPlaying.value)
+            } else {
+                Log.d(tag, "Ignoring YouTube onTimeUpdated (track is ${current?.title ?: "null"}): curSec=$curSec, durSec=$durSec")
+            }
+        }
+        YouTubeBridge.onTrackEnded = {
+            val current = _currentTrack.value
+            if (current != null && current.isYouTubeTrack()) {
+                onTrackCompleted()
+            }
+        }
+        YouTubeBridge.onError = { code ->
+            Log.w(tag, "YouTube playback error code=$code")
+            val current = _currentTrack.value
+            if (current != null && current.isYouTubeTrack()) {
+                _isPlaying.value = false
+                userWantsPlaying = false
+                // Unavailable/private/deleted videos: advance within the current queue.
+                if (code == 100 || code == 101 || code == 150) {
+                    nextTrack(fromUser = false)
+                }
+                updateSessionState()
+                notifySessionChanged()
+            }
+        }
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         try {
             updateSessionState()
         } catch (e: Exception) {
@@ -425,9 +801,26 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
     }
 
+<<<<<<< HEAD
+    private fun createMediaSourceFactory(): androidx.media3.exoplayer.source.MediaSource.Factory {
+        val httpFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(20000)
+        val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(appContext, httpFactory)
+        return androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSourceFactory)
+    }
+
     private fun ensureExoPlayer(): ExoPlayer {
         exoPlayer?.let { return it }
         val player = ExoPlayer.Builder(appContext)
+            .setMediaSourceFactory(createMediaSourceFactory())
+=======
+    private fun ensureExoPlayer(): ExoPlayer {
+        exoPlayer?.let { return it }
+        val player = ExoPlayer.Builder(appContext)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             .setAudioAttributes(
                 ExoAudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -448,6 +841,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private fun ensureCrossfadePlayer(): ExoPlayer {
         crossfadePlayer?.let { return it }
         val player = ExoPlayer.Builder(appContext)
+<<<<<<< HEAD
+            .setMediaSourceFactory(createMediaSourceFactory())
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             .setAudioAttributes(
                 ExoAudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -468,6 +865,31 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     fun removeFromQueue(track: AudioTrackEntity) {
         val current = _currentTrack.value
+<<<<<<< HEAD
+        originalQueue = originalQueue.filter { !it.isSameTrack(track) }
+        shuffledQueue = shuffledQueue.filter { !it.isSameTrack(track) }
+
+        val activeList = if (_isShuffleEnabled.value) shuffledQueue else originalQueue
+        _activeQueue.value = activeList
+
+        if (track.isSameTrack(current)) {
+            if (activeList.isNotEmpty()) {
+                val nextTrack = if (_isShuffleEnabled.value) {
+                    shuffleIndex = shuffleIndex.coerceIn(0, shuffledQueue.lastIndex)
+                    shuffledQueue[shuffleIndex]
+                } else {
+                    activeList.first()
+                }
+                playTrackInternal(nextTrack)
+            } else {
+                stopPlaybackAtQueueEnd()
+                _currentTrack.value = null
+            }
+        } else {
+            if (_isShuffleEnabled.value && current != null) {
+                shuffleIndex = shuffledQueue.indexOfFirst { it.isSameTrack(current) }
+            }
+=======
         val queue = _activeQueue.value.toMutableList()
         queue.removeAll { it.id == track.id }
         _activeQueue.value = queue
@@ -481,6 +903,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 notifySessionChanged()
             }
         } else {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             if (_crossfadeSec.value <= 0f) {
                 prepareNextTrackForGapless()
             }
@@ -501,6 +924,12 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
 
         val current = _currentTrack.value
+<<<<<<< HEAD
+        originalQueue = originalQueue.filter(::isAllowed)
+        shuffledQueue = shuffledQueue.filter(::isAllowed)
+
+        val pruned = if (_isShuffleEnabled.value) shuffledQueue else originalQueue
+=======
         val pruned = _activeQueue.value.filter(::isAllowed)
         if (pruned.size == _activeQueue.value.size &&
             (current == null || isAllowed(current))
@@ -508,10 +937,28 @@ class PlayerEngine private constructor(private val appContext: Context) {
             return
         }
 
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         _activeQueue.value = pruned
 
         if (current != null && !isAllowed(current)) {
             if (pruned.isNotEmpty()) {
+<<<<<<< HEAD
+                val next = if (_isShuffleEnabled.value) {
+                    shuffleIndex = shuffleIndex.coerceIn(0, shuffledQueue.lastIndex)
+                    shuffledQueue[shuffleIndex]
+                } else {
+                    pruned.first()
+                }
+                playTrackInternal(next)
+            } else {
+                stopPlaybackAtQueueEnd()
+                _currentTrack.value = null
+            }
+        } else {
+            if (_isShuffleEnabled.value && current != null) {
+                shuffleIndex = shuffledQueue.indexOfFirst { it.id == current.id }
+            }
+=======
                 playTrack(pruned.first(), pruned)
             } else {
                 userWantsPlaying = false
@@ -521,6 +968,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 notifySessionChanged()
             }
         } else {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             if (_crossfadeSec.value <= 0f) {
                 prepareNextTrackForGapless()
             }
@@ -539,6 +987,24 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
         val current = _currentTrack.value
         val wasPlaying = _isPlaying.value
+<<<<<<< HEAD
+        originalQueue = originalQueue.filterNot { it.uri in missingUris }
+        shuffledQueue = shuffledQueue.filterNot { it.uri in missingUris }
+
+        val pruned = if (_isShuffleEnabled.value) shuffledQueue else originalQueue
+        _activeQueue.value = pruned
+        val currentMissing = current?.uri?.let { it in missingUris } == true
+
+        if (currentMissing) {
+            if (pruned.isNotEmpty()) {
+                val next = if (_isShuffleEnabled.value) {
+                    shuffleIndex = shuffleIndex.coerceIn(0, shuffledQueue.lastIndex)
+                    shuffledQueue[shuffleIndex]
+                } else {
+                    pruned.first()
+                }
+                playTrackInternal(next)
+=======
         val pruned = _activeQueue.value.filterNot { it.uri in missingUris }
         val currentMissing = current?.uri?.let { it in missingUris } == true
 
@@ -550,10 +1016,20 @@ class PlayerEngine private constructor(private val appContext: Context) {
             if (pruned.isNotEmpty()) {
                 val next = pruned.first()
                 playTrack(next, pruned)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 if (!wasPlaying) {
                     togglePlayPause(forcePause = true)
                 }
             } else {
+<<<<<<< HEAD
+                stopPlaybackAtQueueEnd()
+                _currentTrack.value = null
+            }
+        } else {
+            if (_isShuffleEnabled.value && current != null) {
+                shuffleIndex = shuffledQueue.indexOfFirst { it.id == current.id }
+            }
+=======
                 userWantsPlaying = false
                 togglePlayPause(forcePause = true)
                 _currentTrack.value = null
@@ -563,6 +1039,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 notifySessionChanged()
             }
         } else {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             if (_crossfadeSec.value <= 0f) {
                 prepareNextTrackForGapless()
             }
@@ -577,6 +1054,31 @@ class PlayerEngine private constructor(private val appContext: Context) {
             playTrack(track)
             return
         }
+<<<<<<< HEAD
+        if (track.isSameTrack(current)) return
+
+        val oQueue = originalQueue.toMutableList()
+        oQueue.removeAll { it.isSameTrack(track) }
+        var curOrigIdx = oQueue.indexOfFirst { it.isSameTrack(current) }
+        if (curOrigIdx < 0) {
+            oQueue.add(0, current)
+            curOrigIdx = 0
+        }
+        oQueue.add(curOrigIdx + 1, track)
+        originalQueue = oQueue
+
+        if (_isShuffleEnabled.value) {
+            val sQueue = shuffledQueue.toMutableList()
+            sQueue.removeAll { it.isSameTrack(track) }
+            val insertIdx = (shuffleIndex + 1).coerceIn(0, sQueue.size)
+            sQueue.add(insertIdx, track)
+            shuffledQueue = sQueue
+            _activeQueue.value = shuffledQueue
+        } else {
+            _activeQueue.value = originalQueue
+        }
+
+=======
         if (current.id == track.id) return
 
         val queue = _activeQueue.value.toMutableList()
@@ -589,6 +1091,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
         queue.add(currentIndex + 1, track)
         _activeQueue.value = queue
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         if (_crossfadeSec.value <= 0f) {
             prepareNextTrackForGapless()
         }
@@ -596,6 +1099,125 @@ class PlayerEngine private constructor(private val appContext: Context) {
         notifySessionChanged()
     }
 
+<<<<<<< HEAD
+    private fun buildNewShuffledQueue(startingTrack: AudioTrackEntity?) {
+        if (originalQueue.isEmpty()) {
+            shuffledQueue = emptyList()
+            shuffleIndex = -1
+            return
+        }
+        if (originalQueue.size == 1) {
+            shuffledQueue = originalQueue.toList()
+            shuffleIndex = 0
+            return
+        }
+
+        val list = originalQueue.toMutableList()
+        val start = startingTrack ?: list.random()
+        list.removeAll { it.isSameTrack(start) }
+        list.shuffle()
+        shuffledQueue = listOf(start) + list
+        shuffleIndex = 0
+    }
+
+    fun playTrack(track: AudioTrackEntity, customQueue: List<AudioTrackEntity>? = null) {
+        val isSameQueue = customQueue != null && (
+            customQueue === _activeQueue.value || 
+            customQueue === shuffledQueue || 
+            customQueue === originalQueue ||
+            (originalQueue.any { it.isSameTrack(track) } && customQueue.size == originalQueue.size && customQueue.map { it.uri }.toSet() == originalQueue.map { it.uri }.toSet())
+        )
+
+        if (customQueue != null && !isSameQueue) {
+            originalQueue = customQueue.ifEmpty { listOf(track) }
+            if (_isShuffleEnabled.value) {
+                buildNewShuffledQueue(startingTrack = track)
+                _activeQueue.value = shuffledQueue
+            } else {
+                _activeQueue.value = originalQueue
+                shuffleIndex = -1
+            }
+        } else {
+            if (originalQueue.isEmpty() || originalQueue.none { it.isSameTrack(track) }) {
+                val list = libraryFallback()
+                originalQueue = if (list.isNotEmpty()) list else listOf(track)
+            }
+            if (_isShuffleEnabled.value) {
+                val existingIdx = shuffledQueue.indexOfFirst { it.isSameTrack(track) }
+                if (existingIdx >= 0) {
+                    shuffleIndex = existingIdx
+                } else {
+                    buildNewShuffledQueue(startingTrack = track)
+                    _activeQueue.value = shuffledQueue
+                }
+            } else {
+                _activeQueue.value = originalQueue
+                shuffleIndex = -1
+            }
+        }
+        shuffleHistory.clear()
+
+        playTrackInternal(track)
+    }
+
+    fun addToQueue(track: AudioTrackEntity) {
+        val oQueue = originalQueue.toMutableList()
+        oQueue.removeAll { it.id == track.id }
+        oQueue.add(track)
+        originalQueue = oQueue
+
+        if (_isShuffleEnabled.value) {
+            val sQueue = shuffledQueue.toMutableList()
+            sQueue.removeAll { it.id == track.id }
+            sQueue.add(track)
+            shuffledQueue = sQueue
+            _activeQueue.value = shuffledQueue
+        } else {
+            _activeQueue.value = originalQueue
+        }
+        updateSessionState()
+        notifySessionChanged()
+    }
+
+    private fun playYouTubeTrack(track: AudioTrackEntity) {
+        stopEngine(keepSession = true)
+        _currentTrack.value = track
+        publishPosition(position = 0L, duration = track.durationMs, isPlaying = false)
+        userWantsPlaying = true
+        _isPlaying.value = false
+        stopVisualizer()
+        requestPlaybackFocus()
+        updateSessionMetadata(track)
+        updateSessionState()
+        ensureServiceRunning()
+        onTrackStarted?.invoke(track)
+        notifySessionChanged()
+
+        val videoId = track.youtubeVideoId() ?: track.category.removePrefix("yt:").ifBlank { track.id.toString() }
+        YouTubeBridge.loadVideo(videoId)
+    }
+
+    private fun playTrackInternal(track: AudioTrackEntity) {
+        when (track.trackSource()) {
+            TrackSource.YOUTUBE -> {
+                playYouTubeTrack(track)
+                return
+            }
+            TrackSource.SYNTH, TrackSource.LOCAL -> Unit
+        }
+
+        if (!track.canPlayWithExoPlayer() && track.trackSource() != TrackSource.SYNTH) {
+            Log.w(tag, "Cannot play track with empty or non-stream URI: ${track.title}")
+            _currentTrack.value = track
+            _isPlaying.value = false
+            userWantsPlaying = false
+            stopVisualizer()
+            publishPosition(position = 0L, duration = track.durationMs, isPlaying = false)
+            updateSessionMetadata(track)
+            updateSessionState()
+            notifySessionChanged()
+            return
+=======
     fun playTrack(track: AudioTrackEntity, customQueue: List<AudioTrackEntity>? = null) {
         if (customQueue != null) {
             // Prefer the visible (non-blacklisted) library; always keep the track the user tapped
@@ -611,17 +1233,27 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 val list = libraryFallback()
                 _activeQueue.value = if (list.isNotEmpty()) list else listOf(track)
             }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
 
         stopEngine(keepSession = true)
         _currentTrack.value = track
         autoCrossfadeTriggerTrackId = null
         userWantsPlaying = true
+<<<<<<< HEAD
+        publishPosition(position = 0L, duration = track.durationMs, isPlaying = false)
+        pausedByTransientFocusLoss = false
+        mediaSession?.isActive = true
+        val focusGranted = requestPlaybackFocus()
+        _isPlaying.value = false
+        stopVisualizer()
+=======
         _playbackPosition.value = 0L
         pausedByTransientFocusLoss = false
         mediaSession?.isActive = true
         val focusGranted = requestPlaybackFocus()
         _isPlaying.value = focusGranted
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
         if (track.uri == AudioRepository.SYNTH_URI) {
             _playbackDuration.value = track.durationMs
@@ -629,7 +1261,13 @@ class PlayerEngine private constructor(private val appContext: Context) {
             applySynthControls()
             if (focusGranted) {
                 synth.start()
+<<<<<<< HEAD
+                _isPlaying.value = true
                 startProgressTracker(isSynth = true)
+                startVisualizerLoop()
+=======
+                startProgressTracker(isSynth = true)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         } else {
             try {
@@ -641,16 +1279,29 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     .setMediaId(track.id.toString())
                     .build()
                 player.setMediaItem(mediaItem)
+<<<<<<< HEAD
+
+                player.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+
+                player.prepare()
+                player.playWhenReady = focusGranted
+
+=======
                 
                 player.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                 
                 player.prepare()
                 player.playWhenReady = focusGranted
                 
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 if (_crossfadeSec.value <= 0f) {
                     prepareNextTrackForGapless()
                 }
 
+<<<<<<< HEAD
+                applyPlaybackSpeedToEngines()
+                applyVolumeToEngines()
+=======
                 if (focusGranted) {
                     applyPlaybackSpeedToEngines()
                     applyVolumeToEngines()
@@ -659,10 +1310,15 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     applyPlaybackSpeedToEngines()
                     applyVolumeToEngines()
                 }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             } catch (e: Exception) {
                 Log.e(tag, "Failed to start ExoPlayer", e)
                 _isPlaying.value = false
                 userWantsPlaying = false
+<<<<<<< HEAD
+                stopVisualizer()
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         }
 
@@ -677,6 +1333,14 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private fun prepareNextTrackForGapless() {
         val player = exoPlayer ?: return
         val current = _currentTrack.value ?: return
+<<<<<<< HEAD
+        val queue = if (_isShuffleEnabled.value) shuffledQueue else originalQueue
+        if (queue.isEmpty() || current.uri == AudioRepository.SYNTH_URI) return
+
+        val curIdx = player.currentMediaItemIndex
+        if (curIdx > 0) {
+            repeat(curIdx) { player.removeMediaItem(0) }
+=======
         val queue = _activeQueue.value
         if (queue.isEmpty() || current.uri == AudioRepository.SYNTH_URI) return
 
@@ -686,11 +1350,43 @@ class PlayerEngine private constructor(private val appContext: Context) {
             repeat(curIdx) {
                 player.removeMediaItem(0)
             }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
         while (player.mediaItemCount > 1) {
             player.removeMediaItem(1)
         }
 
+<<<<<<< HEAD
+        if (_repeatMode.value == RepeatMode.ONE) return
+
+        val nextTrack: AudioTrackEntity? = if (_isShuffleEnabled.value) {
+            val nextIdx = if (shuffleIndex >= 0) shuffleIndex + 1 else shuffledQueue.indexOfFirst { it.id == current.id } + 1
+            if (nextIdx < shuffledQueue.size) {
+                shuffledQueue[nextIdx]
+            } else if (_repeatMode.value == RepeatMode.ALL && originalQueue.isNotEmpty()) {
+                shuffledQueue.firstOrNull()
+            } else {
+                null
+            }
+        } else {
+            val cur = originalQueue.indexOfFirst { it.id == current.id }
+            if (cur != -1 && cur + 1 < originalQueue.size) {
+                originalQueue[cur + 1]
+            } else if (_repeatMode.value == RepeatMode.ALL && originalQueue.isNotEmpty()) {
+                originalQueue[0]
+            } else {
+                null
+            }
+        }
+
+        if (nextTrack != null && nextTrack.uri.isNotBlank() && nextTrack.uri != AudioRepository.SYNTH_URI) {
+            player.addMediaItem(
+                MediaItem.Builder()
+                    .setUri(Uri.parse(nextTrack.uri))
+                    .setMediaId(nextTrack.id.toString())
+                    .build()
+            )
+=======
         // If repeating one song, ExoPlayer's REPEAT_MODE_ONE handles gapless internally
         if (_repeatMode.value == RepeatMode.ONE) return
 
@@ -714,6 +1410,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                         .build()
                 )
             }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
     }
 
@@ -731,18 +1428,36 @@ class PlayerEngine private constructor(private val appContext: Context) {
     ) {
         restoringSession = true
         try {
+<<<<<<< HEAD
+            originalQueue = queue.ifEmpty { listOf(track) }
+            _isShuffleEnabled.value = shuffleEnabled
+            _repeatMode.value = repeatMode
+            shuffleHistory.clear()
+
+            if (shuffleEnabled) {
+                buildNewShuffledQueue(startingTrack = track)
+                _activeQueue.value = shuffledQueue
+            } else {
+                _activeQueue.value = originalQueue
+                shuffleIndex = -1
+            }
+=======
             val restoredQueue = queue.ifEmpty { listOf(track) }
             _activeQueue.value = restoredQueue
             shuffleHistory.clear()
             _isShuffleEnabled.value = shuffleEnabled
             _repeatMode.value = repeatMode
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
             stopEngine(keepSession = true)
             _currentTrack.value = track
             autoCrossfadeTriggerTrackId = null
             val clampedPos = positionMs.coerceAtLeast(0L)
+<<<<<<< HEAD
+=======
             _playbackPosition.value = clampedPos
             _playbackDuration.value = track.durationMs.coerceAtLeast(0L)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             pausedByTransientFocusLoss = false
             mediaSession?.isActive = true
 
@@ -750,6 +1465,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
             val focusGranted = if (resumePlayback) requestPlaybackFocus() else false
             val shouldPlay = resumePlayback && focusGranted
             _isPlaying.value = shouldPlay
+<<<<<<< HEAD
+            publishPosition(position = clampedPos, duration = track.durationMs.coerceAtLeast(0L), isPlaying = shouldPlay)
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
             if (track.uri == AudioRepository.SYNTH_URI) {
                 applyVolumeToEngines()
@@ -769,6 +1488,25 @@ class PlayerEngine private constructor(private val appContext: Context) {
                         .setMediaId(track.id.toString())
                         .build()
                     player.setMediaItem(mediaItem)
+<<<<<<< HEAD
+                    player.repeatMode = if (repeatMode == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                    player.prepare()
+                    player.seekTo(clampedPos)
+                    player.playWhenReady = shouldPlay
+                    if (shouldPlay) {
+                        applyPlaybackSpeedToEngines()
+                        applyVolumeToEngines()
+                        startProgressTracker(isSynth = false)
+                    } else {
+                        applyPlaybackSpeedToEngines()
+                        applyVolumeToEngines()
+                    }
+                    if (_crossfadeSec.value <= 0f) {
+                        prepareNextTrackForGapless()
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed to restore ExoPlayer", e)
+=======
                     player.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                     player.prepare()
                     player.seekTo(clampedPos)
@@ -785,6 +1523,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     }
                 } catch (e: Exception) {
                     Log.e(tag, "Failed to restore ExoPlayer session", e)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     _isPlaying.value = false
                     userWantsPlaying = false
                 }
@@ -795,7 +1534,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
             if (shouldPlay) {
                 ensureServiceRunning()
             }
+<<<<<<< HEAD
+=======
             // Paused restore: UI shows the track from StateFlows; no FGS/notification needed
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         } finally {
             restoringSession = false
         }
@@ -805,7 +1547,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
     /** Snapshot suitable for [PlaybackSessionStore]; null when nothing is loaded. */
     fun captureSession(): PlaybackSession? {
         val track = _currentTrack.value ?: return null
+<<<<<<< HEAD
+        val queue = originalQueue.ifEmpty { _activeQueue.value }
+=======
         val queue = _activeQueue.value
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         return PlaybackSession(
             trackUri = track.uri,
             queueUris = if (queue.isNotEmpty()) queue.map { it.uri } else listOf(track.uri),
@@ -827,6 +1573,20 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     fun togglePlayPause(forcePlay: Boolean = false, forcePause: Boolean = false) {
         val track = _currentTrack.value ?: return
+<<<<<<< HEAD
+        val currentPlaying = when {
+            track.uri == AudioRepository.SYNTH_URI -> _isPlaying.value
+            track.isYouTubeTrack() -> _isPlaying.value
+            else -> exoPlayer?.isPlaying == true
+        }
+        val shouldPause = when {
+            forcePause -> true
+            forcePlay -> false
+            else -> currentPlaying
+        }
+
+        if (shouldPause) {
+=======
         val shouldPause = when {
             forcePause -> true
             forcePlay -> false
@@ -835,15 +1595,66 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
         if (shouldPause) {
             // Focus-loss pauses go through pauseForFocusLoss(), not here — so this is always intentional
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             userWantsPlaying = false
             pausedByTransientFocusLoss = false
             _isPlaying.value = false
             if (track.uri == AudioRepository.SYNTH_URI) {
                 synth.pause()
+<<<<<<< HEAD
+            } else if (track.isYouTubeTrack()) {
+                publishPosition(isPlaying = false)
+                YouTubeBridge.pause()
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             } else {
                 exoPlayer?.pause()
             }
             progressJob?.cancel()
+<<<<<<< HEAD
+            stopVisualizer()
+            exoPlayer?.let { player ->
+                val validDur = if (player.duration > 0 && player.duration != C.TIME_UNSET) player.duration else _playbackDuration.value
+                publishPosition(position = player.currentPosition.coerceAtLeast(0L), duration = validDur, isPlaying = false)
+            }
+        } else {
+            userWantsPlaying = true
+            pausedByTransientFocusLoss = false
+            val focusGranted = requestPlaybackFocus()
+            if (!focusGranted) {
+                Log.w(tag, "Audio focus not granted")
+                return
+            }
+            if (track.uri == AudioRepository.SYNTH_URI) {
+                synth.start()
+                applySynthControls()
+                _isPlaying.value = true
+                startProgressTracker(isSynth = true)
+                startVisualizerLoop()
+            } else if (track.isYouTubeTrack()) {
+                _isPlaying.value = true
+                publishPosition(isPlaying = true)
+                YouTubeBridge.play()
+            } else {
+                val player = ensureExoPlayer()
+                if (player.playbackState == Player.STATE_IDLE) {
+                    if (player.mediaItemCount == 0) {
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(Uri.parse(track.uri))
+                            .setMediaId(track.id.toString())
+                            .build()
+                        player.setMediaItem(mediaItem)
+                    }
+                    player.prepare()
+                } else if (player.playbackState == Player.STATE_ENDED) {
+                    player.seekTo(0)
+                    player.prepare()
+                }
+                player.playWhenReady = true
+                player.play()
+                applyPlaybackSpeedToEngines()
+                applyVolumeToEngines()
+=======
         } else {
             userWantsPlaying = true
             pausedByTransientFocusLoss = false
@@ -862,6 +1673,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 exoPlayer?.playWhenReady = true
                 exoPlayer?.play()
                 startProgressTracker(isSynth = false)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
             ensureServiceRunning()
         }
@@ -870,15 +1682,98 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     fun nextTrack(fromUser: Boolean = true) {
+<<<<<<< HEAD
+        val current = _currentTrack.value
+        if (originalQueue.isEmpty() || current == null) return
+
+        // 1. REPEAT ONE:
+        if (!fromUser && _repeatMode.value == RepeatMode.ONE) {
+=======
         val queue = _activeQueue.value
         val current = _currentTrack.value
         if (queue.isEmpty()) return
 
         if (!fromUser && _repeatMode.value == RepeatMode.ONE && current != null) {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             replayCurrentTrack()
             return
         }
 
+<<<<<<< HEAD
+        // 2. SHUFFLE MODE:
+        if (_isShuffleEnabled.value) {
+            if (shuffleIndex < 0) {
+                shuffleIndex = shuffledQueue.indexOfFirst { it.isSameTrack(current) }
+            }
+            val nextIdx = shuffleIndex + 1
+
+            if (nextIdx < shuffledQueue.size) {
+                if (shuffleIndex >= 0) shuffleHistory.addLast(shuffleIndex)
+                if (shuffleHistory.size > 64) shuffleHistory.removeFirst()
+                shuffleIndex = nextIdx
+                val nextTrack = shuffledQueue[shuffleIndex]
+                if (tryCrossfadeTo(nextTrack)) return
+                playTrackInternal(nextTrack)
+            } else {
+                if (_repeatMode.value == RepeatMode.ALL) {
+                    val nextCycle = originalQueue.toMutableList()
+                    if (nextCycle.size > 1) {
+                        val lastTrack = shuffledQueue.lastOrNull()
+                        val candidates = nextCycle.filter { !it.isSameTrack(lastTrack) }
+                        val firstTrack = if (candidates.isNotEmpty()) candidates.random() else nextCycle.random()
+                        nextCycle.removeAll { it.isSameTrack(firstTrack) }
+                        nextCycle.shuffle()
+                        shuffledQueue = listOf(firstTrack) + nextCycle
+                    } else {
+                        shuffledQueue = nextCycle
+                    }
+                    shuffleHistory.clear()
+                    shuffleIndex = 0
+                    _activeQueue.value = shuffledQueue
+                    val nextTrack = shuffledQueue[0]
+                    if (tryCrossfadeTo(nextTrack)) return
+                    playTrackInternal(nextTrack)
+                } else {
+                    stopPlaybackAtQueueEnd()
+                }
+            }
+            return
+        }
+
+        // 3. NORMAL / REPEAT ALL (Sequential order):
+        val curIdx = originalQueue.indexOfFirst { it.isSameTrack(current) }
+        val nextIdx = curIdx + 1
+
+        if (curIdx != -1 && nextIdx < originalQueue.size) {
+            val nextTrack = originalQueue[nextIdx]
+            if (tryCrossfadeTo(nextTrack)) return
+            playTrackInternal(nextTrack)
+        } else {
+            if (_repeatMode.value == RepeatMode.ALL && originalQueue.isNotEmpty()) {
+                val nextTrack = originalQueue[0]
+                if (tryCrossfadeTo(nextTrack)) return
+                playTrackInternal(nextTrack)
+            } else {
+                stopPlaybackAtQueueEnd()
+            }
+        }
+    }
+
+    private fun stopPlaybackAtQueueEnd() {
+        userWantsPlaying = false
+        _isPlaying.value = false
+        if (_currentTrack.value?.uri == AudioRepository.SYNTH_URI) {
+            synth.pause()
+            synth.seekToMs(0)
+        } else {
+            exoPlayer?.pause()
+            exoPlayer?.seekTo(0)
+        }
+        publishPosition(position = 0L, isPlaying = false)
+        abandonPlaybackFocus()
+        updateSessionState()
+        notifySessionChanged()
+=======
         val currentIndex = queue.indexOfFirst { it.id == current?.id }
         val nextIndex = when {
             _isShuffleEnabled.value -> {
@@ -905,6 +1800,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
         val next = queue[nextIndex]
         if (tryCrossfadeTo(next)) return
         playTrack(next)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     }
 
     private fun tryCrossfadeTo(nextTrack: AudioTrackEntity): Boolean {
@@ -930,8 +1826,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
             incoming.play()
 
             _currentTrack.value = nextTrack
+<<<<<<< HEAD
+=======
             _playbackPosition.value = 0L
             _playbackDuration.value = nextTrack.durationMs
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             _isPlaying.value = true
             userWantsPlaying = true
             pausedByTransientFocusLoss = false
@@ -941,6 +1840,17 @@ class PlayerEngine private constructor(private val appContext: Context) {
             onTrackStarted?.invoke(nextTrack)
             notifySessionChanged()
 
+<<<<<<< HEAD
+            // Swap players so progress/completion listeners target the active incoming player immediately.
+            primary.removeListener(playerListener)
+            incoming.addListener(playerListener)
+            exoPlayer = incoming
+            crossfadePlayer = primary
+            publishPosition(position = 0L, duration = nextTrack.durationMs, isPlaying = true)
+            startLocalProgressTracker()
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             crossfadeJob?.cancel()
             crossfadeJob = scope.launch {
                 val steps = (fadeSec * 20f).toInt().coerceIn(8, 240)
@@ -955,11 +1865,14 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     delay(stepDelayMs)
                 }
 
+<<<<<<< HEAD
+=======
                 // Swap players so progress/completion listeners target the active one.
                 primary.removeListener(playerListener)
                 incoming.addListener(playerListener)
                 exoPlayer = incoming
                 crossfadePlayer = primary
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 try {
                     primary.pause()
                     primary.stop()
@@ -967,7 +1880,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 } catch (_: Exception) {
                 }
                 applyVolumeToEngines()
+<<<<<<< HEAD
+=======
                 startProgressTracker(isSynth = false)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
             true
         } catch (e: Exception) {
@@ -979,26 +1895,61 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private fun onTrackCompleted() {
         when (_repeatMode.value) {
             RepeatMode.ONE -> replayCurrentTrack()
+<<<<<<< HEAD
+            RepeatMode.ALL -> {
+                if (originalQueue.size <= 1) {
+                    replayCurrentTrack()
+                } else {
+                    nextTrack(fromUser = false)
+                }
+            }
+            RepeatMode.OFF -> nextTrack(fromUser = false)
+=======
             RepeatMode.ALL, RepeatMode.OFF -> nextTrack(fromUser = false)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
     }
 
     private fun replayCurrentTrack() {
         val track = _currentTrack.value ?: return
+<<<<<<< HEAD
+        publishPosition(position = 0L, duration = track.durationMs)
+        if (track.uri == AudioRepository.SYNTH_URI) {
+            synth.seekToMs(0)
+=======
         if (track.uri == AudioRepository.SYNTH_URI) {
             synth.seekToMs(0)
             _playbackPosition.value = 0L
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             if (!_isPlaying.value) {
                 _isPlaying.value = true
                 synth.start()
                 applySynthControls()
             }
             startProgressTracker(isSynth = true)
+<<<<<<< HEAD
+        } else if (track.isYouTubeTrack()) {
+            YouTubeBridge.seekTo(0f)
+            YouTubeBridge.play()
+            _isPlaying.value = true
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         } else {
             val player = exoPlayer
             if (player != null) {
                 try {
                     player.seekTo(0)
+<<<<<<< HEAD
+                    player.playWhenReady = true
+                    player.play()
+                    _isPlaying.value = true
+                    startProgressTracker(isSynth = false)
+                } catch (_: Exception) {
+                    playTrackInternal(track)
+                }
+            } else {
+                playTrackInternal(track)
+=======
                     player.play()
                     _playbackPosition.value = 0L
                     _isPlaying.value = true
@@ -1008,12 +1959,66 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 }
             } else {
                 playTrack(track, _activeQueue.value)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         }
         updateSessionState()
     }
 
     fun previousTrack() {
+<<<<<<< HEAD
+        val current = _currentTrack.value ?: return
+        val queue = if (_isShuffleEnabled.value) shuffledQueue else originalQueue
+        if (queue.isEmpty()) return
+
+        if (_playbackPosition.value > 3000L) {
+            seekTo(0)
+            return
+        }
+
+        if (_isShuffleEnabled.value) {
+            if (shuffleHistory.isNotEmpty()) {
+                val prevIdx = shuffleHistory.removeLast()
+                if (prevIdx in shuffledQueue.indices) {
+                    shuffleIndex = prevIdx
+                    val prevTrack = shuffledQueue[shuffleIndex]
+                    if (tryCrossfadeTo(prevTrack)) return
+                    playTrackInternal(prevTrack)
+                    return
+                }
+            }
+            if (shuffleIndex > 0) {
+                shuffleIndex--
+                val prevTrack = shuffledQueue[shuffleIndex]
+                if (tryCrossfadeTo(prevTrack)) return
+                playTrackInternal(prevTrack)
+            } else {
+                if (_repeatMode.value == RepeatMode.ALL && shuffledQueue.isNotEmpty()) {
+                    shuffleIndex = shuffledQueue.lastIndex
+                    val prevTrack = shuffledQueue[shuffleIndex]
+                    if (tryCrossfadeTo(prevTrack)) return
+                    playTrackInternal(prevTrack)
+                } else {
+                    seekTo(0)
+                }
+            }
+        } else {
+            val curIdx = originalQueue.indexOfFirst { it.isSameTrack(current) }
+            if (curIdx > 0) {
+                val prevTrack = originalQueue[curIdx - 1]
+                if (tryCrossfadeTo(prevTrack)) return
+                playTrackInternal(prevTrack)
+            } else {
+                if (_repeatMode.value == RepeatMode.ALL && originalQueue.isNotEmpty()) {
+                    val prevTrack = originalQueue.last()
+                    if (tryCrossfadeTo(prevTrack)) return
+                    playTrackInternal(prevTrack)
+                } else {
+                    seekTo(0)
+                }
+            }
+        }
+=======
         val queue = _activeQueue.value
         val current = _currentTrack.value
         if (queue.isEmpty()) return
@@ -1031,25 +2036,67 @@ class PlayerEngine private constructor(private val appContext: Context) {
             }
         }
         playTrack(queue[prevIndex.coerceIn(0, queue.lastIndex)])
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     }
 
     fun seekTo(positionMs: Long) {
         val track = _currentTrack.value ?: return
         val clamped = positionMs.coerceIn(0L, max(_playbackDuration.value, 0L))
+<<<<<<< HEAD
+        Log.d(tag, "Local seekTo: target=$positionMs, clamped=$clamped, currentExoPos=${exoPlayer?.currentPosition}")
+        if (track.uri == AudioRepository.SYNTH_URI) {
+            synth.seekToMs(clamped)
+            publishPosition(position = clamped, duration = _playbackDuration.value)
+        } else if (track.isYouTubeTrack()) {
+            YouTubeBridge.seekTo(clamped / 1000f)
+            publishPosition(position = clamped, duration = _playbackDuration.value)
+        } else {
+            exoPlayer?.let { player ->
+                player.seekTo(clamped)
+                val realPos = player.currentPosition.coerceAtLeast(0L)
+                val targetPos = if (realPos == 0L && clamped > 0L) clamped else realPos
+                val validDur = if (player.duration > 0 && player.duration != C.TIME_UNSET) player.duration else _playbackDuration.value
+                publishPosition(position = targetPos, duration = validDur, isPlaying = player.isPlaying)
+                if (player.isPlaying) {
+                    startLocalProgressTracker()
+                }
+            }
+=======
         if (track.uri == AudioRepository.SYNTH_URI) {
             synth.seekToMs(clamped)
             _playbackPosition.value = clamped
         } else {
             exoPlayer?.seekTo(clamped)
             _playbackPosition.value = clamped
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
         updateSessionState()
         notifySessionChanged()
     }
 
     fun toggleShuffle() {
+<<<<<<< HEAD
+        setShuffleEnabled(!_isShuffleEnabled.value)
+    }
+
+    fun setShuffleEnabled(enabled: Boolean) {
+        if (_isShuffleEnabled.value == enabled) return
+        _isShuffleEnabled.value = enabled
+        shuffleHistory.clear()
+
+        val current = _currentTrack.value
+        if (enabled) {
+            buildNewShuffledQueue(startingTrack = current)
+            _activeQueue.value = shuffledQueue
+        } else {
+            _activeQueue.value = originalQueue
+            shuffleIndex = -1
+        }
+
+=======
         _isShuffleEnabled.value = !_isShuffleEnabled.value
         if (!_isShuffleEnabled.value) shuffleHistory.clear()
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         if (_crossfadeSec.value <= 0f) {
             prepareNextTrackForGapless()
         }
@@ -1058,12 +2105,25 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     fun toggleLoop() {
+<<<<<<< HEAD
+        val next = when (_repeatMode.value) {
+=======
         _repeatMode.value = when (_repeatMode.value) {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             RepeatMode.OFF -> RepeatMode.ALL
             RepeatMode.ALL -> RepeatMode.ONE
             RepeatMode.ONE -> RepeatMode.OFF
         }
+<<<<<<< HEAD
+        setRepeatMode(next)
+    }
+
+    fun setRepeatMode(mode: RepeatMode) {
+        _repeatMode.value = mode
+        exoPlayer?.repeatMode = if (mode == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+=======
         exoPlayer?.repeatMode = if (_repeatMode.value == RepeatMode.ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         if (_crossfadeSec.value <= 0f) {
             prepareNextTrackForGapless()
         }
@@ -1071,6 +2131,32 @@ class PlayerEngine private constructor(private val appContext: Context) {
         notifySessionChanged()
     }
 
+<<<<<<< HEAD
+    fun cyclePlaybackMode() {
+        when {
+            _repeatMode.value == RepeatMode.ONE -> {
+                _repeatMode.value = RepeatMode.OFF
+                exoPlayer?.repeatMode = Player.REPEAT_MODE_OFF
+                setShuffleEnabled(false)
+            }
+            !_isShuffleEnabled.value && _repeatMode.value == RepeatMode.OFF -> {
+                _repeatMode.value = RepeatMode.OFF
+                exoPlayer?.repeatMode = Player.REPEAT_MODE_OFF
+                setShuffleEnabled(true)
+            }
+            _isShuffleEnabled.value && _repeatMode.value != RepeatMode.ALL -> {
+                setShuffleEnabled(false)
+                setRepeatMode(RepeatMode.ALL)
+            }
+            else -> {
+                setShuffleEnabled(false)
+                setRepeatMode(RepeatMode.ONE)
+            }
+        }
+    }
+
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     fun updateSynthCutoff(cutoff: Float) {
         _synthCutoff.value = cutoff
         applySynthControls()
@@ -1192,6 +2278,26 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     /** Moves the queue item at [fromIndex] to [toIndex]. No-op if indices are out of range. */
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
+<<<<<<< HEAD
+        val targetList = if (_isShuffleEnabled.value) shuffledQueue else originalQueue
+        if (fromIndex !in targetList.indices || toIndex !in targetList.indices || fromIndex == toIndex) return
+
+        val mutable = targetList.toMutableList()
+        val item = mutable.removeAt(fromIndex)
+        mutable.add(toIndex, item)
+
+        if (_isShuffleEnabled.value) {
+            shuffledQueue = mutable
+            _activeQueue.value = shuffledQueue
+            _currentTrack.value?.let { current ->
+                shuffleIndex = shuffledQueue.indexOfFirst { it.id == current.id }
+            }
+        } else {
+            originalQueue = mutable
+            _activeQueue.value = originalQueue
+        }
+
+=======
         val queue = _activeQueue.value.toMutableList()
         if (fromIndex < 0 || fromIndex >= queue.size) return
         if (toIndex < 0 || toIndex >= queue.size) return
@@ -1199,6 +2305,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
         val item = queue.removeAt(fromIndex)
         queue.add(toIndex, item)
         _activeQueue.value = queue
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         if (_crossfadeSec.value <= 0f) {
             prepareNextTrackForGapless()
         }
@@ -1300,6 +2407,61 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
         releaseAudioEffects()
         attachedAudioSessionId = sessionId
+<<<<<<< HEAD
+
+        val hasRecordAudio = androidx.core.content.ContextCompat.checkSelfPermission(
+            appContext,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (hasRecordAudio) {
+            try {
+                visualizer = Visualizer(sessionId).apply {
+                    captureSize = Visualizer.getCaptureSizeRange()[1]
+                    setDataCaptureListener(
+                        object : Visualizer.OnDataCaptureListener {
+                            override fun onWaveFormDataCapture(
+                                visualizer: Visualizer?,
+                                waveform: ByteArray?,
+                                samplingRate: Int
+                            ) {
+                                if (waveform == null) return
+                                visualizerTarget = List(24) { i ->
+                                    val idx = (i * waveform.size / 24).coerceIn(0, waveform.size - 1)
+                                    val amp = abs(waveform[idx].toInt()) / 128f
+                                    amp.coerceIn(0.08f, 1f)
+                                }
+                            }
+
+                            override fun onFftDataCapture(
+                                visualizer: Visualizer?,
+                                fft: ByteArray?,
+                                samplingRate: Int
+                            ) {
+                                if (fft == null || fft.size < 4) return
+                                visualizerTarget = List(24) { i ->
+                                    val n = fft.size / 2
+                                    val bin = 1 + (i * (n - 1) / 24).coerceIn(1, n - 1)
+                                    val re = fft.getOrNull(bin * 2)?.toInt() ?: 0
+                                    val im = fft.getOrNull(bin * 2 + 1)?.toInt() ?: 0
+                                    val mag = ln(1.0 + re * re + im * im).toFloat()
+                                    (mag / 12f).coerceIn(0.08f, 1f)
+                                }
+                            }
+                        },
+                        Visualizer.getMaxCaptureRate() / 2,
+                        false,
+                        true
+                    )
+                    enabled = true
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "Visualizer unavailable", e)
+                visualizer = null
+            }
+        } else {
+            visualizer = null
+=======
         try {
             visualizer = Visualizer(sessionId).apply {
                 captureSize = Visualizer.getCaptureSizeRange()[1]
@@ -1342,6 +2504,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
             }
         } catch (e: Exception) {
             Log.w(tag, "Visualizer unavailable", e)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
 
         try {
@@ -1380,7 +2543,13 @@ class PlayerEngine private constructor(private val appContext: Context) {
         progressJob?.cancel()
         crossfadeJob?.cancel()
         synth.stop()
+<<<<<<< HEAD
+        YouTubeBridge.pause()
         releaseAudioEffects()
+        stopVisualizer()
+=======
+        releaseAudioEffects()
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         exoPlayer?.let { player ->
             try {
                 player.stop()
@@ -1402,6 +2571,47 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
     }
 
+<<<<<<< HEAD
+    private fun startLocalProgressTracker() {
+        progressJob?.cancel()
+        progressJob = scope.launch {
+            var lastPos = -1L
+            while (_isPlaying.value && isActive) {
+                val player = exoPlayer
+                if (player != null && (player.isPlaying || player.playbackState == Player.STATE_READY)) {
+                    val pos = player.currentPosition.coerceAtLeast(0L)
+                    val dur = player.duration
+                    val validDur = if (dur > 0 && dur != C.TIME_UNSET) dur else _playbackDuration.value
+
+                    Log.d(
+                        tag,
+                        "LOCAL PLAYER isPlaying=${player.isPlaying} currentPosition=${player.currentPosition} duration=${player.duration} playbackState=${player.playbackState} mediaItem=${player.currentMediaItem?.mediaId}"
+                    )
+
+                    if (lastPos >= 0L && pos < lastPos && (lastPos - pos) > 1000L) {
+                        Log.w(tag, "Local playback position jumped backward: $lastPos -> $pos (ExoPlayer currentPosition: ${player.currentPosition})")
+                    }
+                    lastPos = pos
+
+                    publishPosition(position = pos, duration = validDur, isPlaying = player.isPlaying)
+
+                    val track = _currentTrack.value
+                    val fadeMs = (_crossfadeSec.value * 1000f).toLong().coerceAtLeast(250L)
+                    if (
+                        track != null &&
+                        track.uri != AudioRepository.SYNTH_URI &&
+                        _crossfadeSec.value > 0f &&
+                        _repeatMode.value != RepeatMode.ONE &&
+                        autoCrossfadeTriggerTrackId != track.id &&
+                        player.isPlaying &&
+                        validDur > 0
+                    ) {
+                        val remainingMs = validDur - pos
+                        if (remainingMs in 1L..fadeMs) {
+                            autoCrossfadeTriggerTrackId = track.id
+                            nextTrack(fromUser = false)
+                            continue
+=======
     private fun startProgressTracker(isSynth: Boolean) {
         progressJob?.cancel()
         progressJob = scope.launch {
@@ -1440,16 +2650,66 @@ class PlayerEngine private constructor(private val appContext: Context) {
                                     continue
                                 }
                             }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                         }
                     }
                 }
                 // Position-only MediaSession update — avoid rebuilding the notification every tick
                 updateSessionPlaybackState(notify = false)
+<<<<<<< HEAD
+                delay(250L)
+=======
                 delay(500)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         }
     }
 
+<<<<<<< HEAD
+    private fun startSynthProgressTracker() {
+        progressJob?.cancel()
+        progressJob = scope.launch {
+            while (_isPlaying.value && isActive) {
+                val pos = synth.positionMs()
+                val dur = _playbackDuration.value
+                val safePos = if (dur > 0) pos % dur else pos
+                publishPosition(position = safePos, duration = dur, isPlaying = true)
+                if (dur > 0 && pos >= dur) {
+                    onTrackCompleted()
+                    if (_repeatMode.value != RepeatMode.ONE) break
+                }
+                updateSessionPlaybackState(notify = false)
+                delay(250L)
+            }
+        }
+    }
+
+    private fun startProgressTracker(isSynth: Boolean) {
+        if (isSynth) {
+            startSynthProgressTracker()
+        } else {
+            startLocalProgressTracker()
+        }
+    }
+
+    private fun stopVisualizer() {
+        visualizerJob?.cancel()
+        visualizerJob = null
+        visualizerTarget = List(24) { 0.08f }
+        _waveformAmplitudes.value = List(24) { 0.08f }
+    }
+
+    private fun startVisualizerLoop() {
+        if (!_isPlaying.value) {
+            stopVisualizer()
+            return
+        }
+        if (visualizerJob?.isActive == true) return
+        visualizerJob = scope.launch(Dispatchers.Default) {
+            while (isActive && _isPlaying.value) {
+                val track = _currentTrack.value
+                if (track?.uri == AudioRepository.SYNTH_URI) {
+=======
     private fun startVisualizerLoop() {
         visualizerJob?.cancel()
         visualizerJob = scope.launch(Dispatchers.Default) {
@@ -1467,6 +2727,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
                 val track = _currentTrack.value
                 if (playing && track?.uri == AudioRepository.SYNTH_URI) {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     val rootAmp = (synth.lastWaveformValue + 1.0f) / 2.0f
                     val t = System.currentTimeMillis() * 0.012
                     visualizerTarget = List(24) { index ->
@@ -1475,8 +2736,25 @@ class PlayerEngine private constructor(private val appContext: Context) {
                         val harmonic = kotlin.math.sin(phase * 2.0 + t * 1.4).toFloat() * 0.15f
                         ((rootAmp * 0.7f) + (modulation * 0.22f) + harmonic + 0.08f).coerceIn(0.08f, 1f)
                     }
+<<<<<<< HEAD
+                } else if (track != null) {
+                    if (visualizer == null) {
+                        // Dynamic live visualizer for audio / YouTube music tracks
+                        val t = System.currentTimeMillis() * 0.008
+                        val seed = (track.id.hashCode() and 0xFFFF) * 0.001
+                        visualizerTarget = List(24) { i ->
+                            val phase = (i / 24f) * Math.PI * 2.0
+                            val wave1 = sin(phase * 2f + t * 1.8 + seed).toFloat() * 0.35f
+                            val wave2 = cos(phase * 3f - t * 2.5).toFloat() * 0.25f
+                            val beatPulse = sin(t * 3.14159 * 2.2).toFloat().coerceAtLeast(0f) * 0.22f
+                            val base = 0.25f + (sin(i * 0.8 + seed * 5f).toFloat() * 0.15f)
+                            (base + wave1 + wave2 + beatPulse).coerceIn(0.12f, 0.95f)
+                        }
+                    }
+=======
                 } else if (!playing) {
                     visualizerTarget = visualizerTarget.map { (it * 0.82f).coerceAtLeast(0.08f) }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 }
 
                 // Smooth interpolation toward target for reactive, performant bars
@@ -1489,8 +2767,15 @@ class PlayerEngine private constructor(private val appContext: Context) {
                     (prev + (target - prev) * alpha).coerceIn(0.08f, 1f)
                 }
                 _waveformAmplitudes.value = smoothed
+<<<<<<< HEAD
+                delay(33L)
+            }
+            visualizerTarget = List(24) { 0.08f }
+            _waveformAmplitudes.value = List(24) { 0.08f }
+=======
                 delay(if (playing) 33L else 120L)
             }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         }
     }
 
@@ -1514,7 +2799,11 @@ class PlayerEngine private constructor(private val appContext: Context) {
         artworkJob?.cancel()
         artworkJob = scope.launch {
             val art = withContext(Dispatchers.IO) { loadArtworkBitmap(track.albumArtUri) }
+<<<<<<< HEAD
+            if (track.isSameTrack(_currentTrack.value)) {
+=======
             if (_currentTrack.value?.id == track.id) {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 val withArt = MediaMetadataCompat.Builder(builder.build())
                 if (art != null) {
                     withArt.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
@@ -1529,6 +2818,36 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private fun loadArtworkBitmap(uriString: String?): Bitmap? {
         if (uriString.isNullOrBlank()) return null
         return try {
+<<<<<<< HEAD
+            val bitmap = if (uriString.startsWith("http://") || uriString.startsWith("https://")) {
+                val conn = (URL(uriString).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                    setRequestProperty("User-Agent", "Mozilla/5.0")
+                }
+                conn.inputStream.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
+            } else {
+                val uri = Uri.parse(uriString)
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                appContext.contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(it, null, bounds)
+                }
+                var sample = 1
+                val maxDim = 512
+                var halfH = bounds.outHeight / 2
+                var halfW = bounds.outWidth / 2
+                while (halfH / sample >= maxDim && halfW / sample >= maxDim) {
+                    sample *= 2
+                }
+                val opts = BitmapFactory.Options().apply { inSampleSize = sample.coerceAtLeast(1) }
+                appContext.contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(it, null, opts)
+                }
+            }
+            if (bitmap != null) ArtworkTransformer.cropLetterboxBars(bitmap) else null
+=======
             val uri = Uri.parse(uriString)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             appContext.contentResolver.openInputStream(uri)?.use {
@@ -1545,6 +2864,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
             appContext.contentResolver.openInputStream(uri)?.use {
                 BitmapFactory.decodeStream(it, null, opts)
             }
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         } catch (_: Exception) {
             null
         }
@@ -1568,9 +2888,28 @@ class PlayerEngine private constructor(private val appContext: Context) {
             PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
             PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
             PlaybackStateCompat.ACTION_SEEK_TO or
+<<<<<<< HEAD
+            PlaybackStateCompat.ACTION_STOP or
+            PlaybackStateCompat.ACTION_SET_SHUFFLE_MODE or
+            PlaybackStateCompat.ACTION_SET_REPEAT_MODE
+        mediaSession?.isActive = _currentTrack.value != null
+        val speed = if (_isPlaying.value) _playbackSpeed.value else 0f
+        mediaSession?.setShuffleMode(
+            if (_isShuffleEnabled.value) PlaybackStateCompat.SHUFFLE_MODE_ALL
+            else PlaybackStateCompat.SHUFFLE_MODE_NONE
+        )
+        mediaSession?.setRepeatMode(
+            when (_repeatMode.value) {
+                RepeatMode.OFF -> PlaybackStateCompat.REPEAT_MODE_NONE
+                RepeatMode.ALL -> PlaybackStateCompat.REPEAT_MODE_ALL
+                RepeatMode.ONE -> PlaybackStateCompat.REPEAT_MODE_ONE
+            }
+        )
+=======
             PlaybackStateCompat.ACTION_STOP
         mediaSession?.isActive = _currentTrack.value != null
         val speed = if (_isPlaying.value) _playbackSpeed.value else 0f
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setActions(actions)
@@ -1606,9 +2945,16 @@ class PlayerEngine private constructor(private val appContext: Context) {
 
     /** @return true when audio focus was granted immediately. */
     private fun requestPlaybackFocus(): Boolean {
+<<<<<<< HEAD
+        if (hasAudioFocus) return true
+        val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val req = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+=======
         val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -1618,8 +2964,12 @@ class PlayerEngine private constructor(private val appContext: Context) {
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)
                 .setAcceptsDelayedFocusGain(true)
                 .setWillPauseWhenDucked(false)
+<<<<<<< HEAD
+                .build().also { audioFocusRequest = it }
+=======
                 .build()
             audioFocusRequest = req
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             am.requestAudioFocus(req)
         } else {
             @Suppress("DEPRECATION")
@@ -1635,6 +2985,10 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     private fun abandonPlaybackFocus() {
+<<<<<<< HEAD
+        if (!hasAudioFocus) return
+=======
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }

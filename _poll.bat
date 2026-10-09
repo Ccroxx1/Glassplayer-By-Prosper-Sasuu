@@ -12,4 +12,8 @@ echo === JAVA ===
 tasklist /FI "IMAGENAME eq java.exe"
 echo === GRADLE CACHE ===
 dir /b "C:\Users\Sasuu\.gradle\wrapper\dists" 2>nul
+<<<<<<< HEAD
 dir /s /b "C:\Users\Sasuu\.gradle\wrapper\dists\gradle-9.0-bin\*\gradle-9.0-bin.zip*" 2>nul
+=======
+dir /s /b "C:\Users\Sasuu\.gradle\wrapper\dists\gradle-9.0-bin\*\gradle-9.0-bin.zip*" 2>nul
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e

@@ -71,7 +71,11 @@ class PlaybackService : Service() {
         }
 
         // Sticky restart / ensure with nothing to play — do not linger as an empty FGS
+<<<<<<< HEAD
+        if (engine.currentTrack.value == null && !engine.isPlaying.value) {
+=======
         if (engine.currentTrack.value == null) {
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             tearDownForeground()
             // Avoid leaving an idle engine (visualizer loop) after sticky restart
             if (intent?.action == null || intent.action == ACTION_ENSURE_FOREGROUND) {
@@ -152,6 +156,21 @@ class PlaybackService : Service() {
     }
 
     private fun promoteToForeground(engine: PlayerEngine) {
+<<<<<<< HEAD
+        val notification = buildNotification(this, engine)
+        try {
+            startAsForeground(notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start/update foreground", e)
+            try {
+                // Always ensure startForeground is attempted to prevent Android 12+ FGS crashes
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    startForeground(NOTIFICATION_ID, notification)
+                } else {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(NOTIFICATION_ID, notification)
+                }
+=======
         try {
             startAsForeground(buildNotification(this, engine))
         } catch (e: Exception) {
@@ -159,6 +178,7 @@ class PlaybackService : Service() {
             try {
                 val nm = getSystemService(NotificationManager::class.java)
                 nm.notify(NOTIFICATION_ID, buildNotification(this, engine))
+>>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             } catch (inner: Exception) {
                 Log.e(TAG, "Notification fallback failed", inner)
             }
