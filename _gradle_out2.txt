@@ -1,7 +1,2 @@
-<<<<<<< HEAD
 '.\gradlew.bat' is not recognized as an internal or external command,
 operable program or batch file.
-=======
-'.\gradlew.bat' is not recognized as an internal or external command,
-operable program or batch file.
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e

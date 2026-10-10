@@ -6,9 +6,11 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -626,61 +628,69 @@ fun OnlineMusicView(
             // Tab Content Rendering
             when (subTab) {
                 "Songs" -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    if (isSelectMode) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Button(
-                                onClick = { playAllSongs() },
-                                colors = ButtonDefaults.buttonColors(containerColor = YoutubeRed),
-                                shape = RoundedCornerShape(20.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                enabled = trackList.isNotEmpty()
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Rounded.PlayArrow,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Play All", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = {
+                                        if (selectedIds.isNotEmpty()) {
+                                            playSelectedSongs()
+                                        } else {
+                                            playAllSongs()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = YoutubeRed),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    enabled = trackList.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        if (selectedIds.isNotEmpty()) "Play Selected" else "Play All",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        isSelectMode = false
+                                        selectedIds = emptySet()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = YoutubeRed.copy(alpha = 0.35f)),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Cancel",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
 
-                            Button(
-                                onClick = {
-                                    isSelectMode = !isSelectMode
-                                    if (!isSelectMode) selectedIds = emptySet()
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelectMode) YoutubeRed.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.1f)
-                                ),
-                                shape = RoundedCornerShape(20.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    if (isSelectMode) Icons.Rounded.Close else Icons.Rounded.SelectAll,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    if (isSelectMode) "Cancel" else "Select Songs",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        if (isSelectMode) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     "${selectedIds.size} selected",
@@ -739,6 +749,14 @@ fun OnlineMusicView(
                                         selectedIds = if (isSelected) selectedIds - track.id else selectedIds + track.id
                                     },
                                     onAddToPlaylist = { trackForPlaylist = track },
+                                    onLongClick = {
+                                        if (!isSelectMode) {
+                                            isSelectMode = true
+                                            selectedIds = setOf(track.id)
+                                        } else {
+                                            selectedIds = if (isSelected) selectedIds - track.id else selectedIds + track.id
+                                        }
+                                    },
                                     onClick = {
                                         if (isSelectMode) {
                                             selectedIds = if (isSelected) selectedIds - track.id else selectedIds + track.id
@@ -1214,6 +1232,7 @@ fun OnlineMusicView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun YoutubeTrackRow(
     track: OnlineTrack,
@@ -1223,6 +1242,7 @@ private fun YoutubeTrackRow(
     isSelected: Boolean = false,
     onSelectToggle: () -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
+    onLongClick: () -> Unit = {},
     onClick: () -> Unit
 ) {
     Row(
@@ -1241,7 +1261,10 @@ private fun YoutubeTrackRow(
                 else Color.White.copy(alpha = 0.08f),
                 RoundedCornerShape(12.dp)
             )
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -121,12 +121,9 @@ class AudioViewModel(
             tracks.filter { it.folderName !in blocked || it.uri == AudioRepository.SYNTH_URI }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-<<<<<<< HEAD
     val recentYouTubeTracks: StateFlow<List<AudioTrackEntity>> = repository.recentYouTubeTracks
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     val allPlaylists: StateFlow<List<PlaylistEntity>> = repository.allPlaylists
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -134,7 +131,6 @@ class AudioViewModel(
     val isPlaying = engine.isPlaying
     val playbackPosition = engine.playbackPosition
     val playbackDuration = engine.playbackDuration
-<<<<<<< HEAD
     val playbackProgress = engine.playbackProgress
     val isShuffleEnabled = engine.isShuffleEnabled
     val repeatMode = engine.repeatMode
@@ -147,10 +143,6 @@ class AudioViewModel(
             else -> PlaybackMode.NORMAL
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlaybackMode.NORMAL)
-=======
-    val isShuffleEnabled = engine.isShuffleEnabled
-    val repeatMode = engine.repeatMode
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     val activeQueue = engine.activeQueue
     val waveformAmplitudes = engine.waveformAmplitudes
     val synthCutoff = engine.synthCutoff
@@ -235,7 +227,6 @@ class AudioViewModel(
         engine.setLibraryProvider { allTracks.value }
         engine.onTrackStarted = { track ->
             viewModelScope.launch {
-<<<<<<< HEAD
                 try {
                     val realTrackId = repository.upsertTrack(track).toInt()
                     if (realTrackId > 0) {
@@ -245,10 +236,6 @@ class AudioViewModel(
                 } catch (e: Exception) {
                     Log.w(tag, "Failed to record play", e)
                 }
-=======
-                repository.incrementPlayCount(track.id, System.currentTimeMillis())
-                scrobbleNowPlaying(track)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         }
         engine.onSessionChanged = {
@@ -256,12 +243,8 @@ class AudioViewModel(
         }
         viewModelScope.launch {
             try {
-<<<<<<< HEAD
                 repository.cleanInvalidData()
                 // Keep persisted YouTube playlist tracks; only repair identities.
-=======
-                repository.deleteNonDeviceTracks()
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 // Drop built-in Neon Pulse so it never reappears in the library
                 if (engine.currentTrack.value?.uri == AudioRepository.SYNTH_URI) {
                     engine.togglePlayPause(forcePause = true)
@@ -417,25 +400,19 @@ class AudioViewModel(
         engine.removeFromQueue(track)
     }
 
-<<<<<<< HEAD
     fun addToQueue(track: AudioTrackEntity) {
         engine.addToQueue(track)
     }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     fun togglePlayPause() = engine.togglePlayPause()
     fun nextTrack() = engine.nextTrack()
     fun previousTrack() = engine.previousTrack()
     fun seekTo(positionMs: Long) = engine.seekTo(positionMs)
     fun toggleShuffle() = engine.toggleShuffle()
     fun toggleLoop() = engine.toggleLoop()
-<<<<<<< HEAD
     fun cyclePlaybackMode() = engine.cyclePlaybackMode()
     fun setShuffleEnabled(enabled: Boolean) = engine.setShuffleEnabled(enabled)
     fun setRepeatMode(mode: RepeatMode) = engine.setRepeatMode(mode)
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     fun updateSynthCutoff(cutoff: Float) = engine.updateSynthCutoff(cutoff)
     fun updateSynthSpeed(speed: Float) = engine.updateSynthSpeed(speed)
     fun setPlaybackSpeed(speed: Float) = engine.setPlaybackSpeed(speed)
@@ -1159,13 +1136,9 @@ class AudioViewModel(
     }
 
     fun addTracksToPlaylist(playlistId: Int, tracks: Collection<AudioTrackEntity>) {
-<<<<<<< HEAD
         viewModelScope.launch {
             tracks.forEach { repository.addTrackEntityToPlaylist(playlistId, it) }
         }
-=======
-        viewModelScope.launch { tracks.forEach { repository.addTrackToPlaylist(playlistId, it.id) } }
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     }
 
     fun setFavorites(tracks: Collection<AudioTrackEntity>, favorite: Boolean) {
@@ -1182,20 +1155,16 @@ class AudioViewModel(
         }
     }
 
-<<<<<<< HEAD
     fun clearRecentYouTubeHistory() {
         viewModelScope.launch {
             repository.clearRecentYouTubeHistory()
         }
     }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     fun createPlaylist(name: String) {
         viewModelScope.launch { repository.createPlaylist(name) }
     }
 
-<<<<<<< HEAD
     fun importYouTubePlaylist(
         onlinePlaylist: OnlinePlaylistResult,
         customName: String? = null,
@@ -1207,8 +1176,6 @@ class AudioViewModel(
         }
     }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     fun deletePlaylist(playlistId: Int) {
         viewModelScope.launch { repository.deletePlaylist(playlistId) }
     }
@@ -1217,7 +1184,6 @@ class AudioViewModel(
         viewModelScope.launch { repository.addTrackToPlaylist(playlistId, trackId) }
     }
 
-<<<<<<< HEAD
     fun addTrackEntityToPlaylist(
         playlistId: Int,
         track: AudioTrackEntity,
@@ -1260,8 +1226,6 @@ class AudioViewModel(
         }
     }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     fun removeTrackFromPlaylist(playlistId: Int, trackId: Int) {
         viewModelScope.launch { repository.removeTrackFromPlaylist(playlistId, trackId) }
     }

@@ -47,7 +47,6 @@ data class PlaylistEntity(
 @Entity(tableName = "playlist_track_cross_ref", primaryKeys = ["playlistId", "trackId"])
 data class PlaylistTrackCrossRefEntity(
     val playlistId: Int,
-<<<<<<< HEAD
     val trackId: Int,
     val position: Int = 0
 )
@@ -66,7 +65,3 @@ fun AudioTrackEntity.isSameTrack(other: AudioTrackEntity?): Boolean {
     }
     return this.title.equals(other.title, ignoreCase = true) && this.artist.equals(other.artist, ignoreCase = true)
 }
-=======
-    val trackId: Int
-)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e

@@ -54,14 +54,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-<<<<<<< HEAD
 import androidx.media3.common.C
 import coil.size.Size
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.viewinterop.AndroidView
-=======
-import coil.size.Size
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -286,7 +282,6 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                 )
             }
 
-<<<<<<< HEAD
             // Permanent Background Host for YouTube Music Playback
             // Stays continuously attached to the Window hierarchy across ALL tab switches!
             Box(
@@ -306,8 +301,6 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                 )
             }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             // Scaffolding content
             Scaffold(
                 containerColor = Color.Transparent,
@@ -354,10 +347,7 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                                 when (activeTab) {
                                     strings.browse -> TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, strings = strings)
                                     strings.favorites -> FavoritesView(viewModel)
-<<<<<<< HEAD
                                     strings.onlineMusic -> OnlineMusicView(viewModel = viewModel, strings = strings)
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                                 }
                             }
 
@@ -402,7 +392,6 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                                 ) {
                                     MainPlayerView(viewModel)
                                 }
-<<<<<<< HEAD
                                 strings.onlineMusic -> Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -414,8 +403,6 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                                         onTrackSelected = { activeTab = strings.nowPlaying }
                                     )
                                 }
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                             }
                         }
 
@@ -696,11 +683,7 @@ fun GlassHeader(
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(currentTrack.albumArtUri)
-<<<<<<< HEAD
                             .transformations(CleanArtworkTransformation())
-=======
-                            .size(Size(960, 320))
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                             .crossfade(true)
                             .allowHardware(true)
                             .build(),
@@ -874,7 +857,6 @@ fun GlassHeader(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val tabs = if (isTablet) {
-<<<<<<< HEAD
                     listOf(strings.browse, strings.favorites, strings.onlineMusic)
                 } else {
                     listOf(strings.browse, strings.nowPlaying, strings.favorites, strings.onlineMusic)
@@ -886,15 +868,6 @@ fun GlassHeader(
                         strings.onlineMusic -> Color(0xFFFF0033)
                         else -> GlassCyan
                     }
-=======
-                    listOf(strings.browse, strings.favorites)
-                } else {
-                    listOf(strings.browse, strings.nowPlaying, strings.favorites)
-                }
-                tabs.forEach { tab ->
-                    val isSelected = activeTab == tab
-                    val tabGlowColor = if (tab == "Now Playing") GlassMagenta else GlassCyan
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
                     Box(
                         modifier = Modifier
@@ -1367,13 +1340,7 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                 "Playlists" -> {
                     if (selectedPlaylist != null) {
                         val playlistTracksRaw by viewModel.getTracksInPlaylist(selectedPlaylist!!.id).collectAsState(initial = emptyList())
-<<<<<<< HEAD
                         val playlistTracks = playlistTracksRaw
-=======
-                        val playlistTracks = remember(playlistTracksRaw, sortMode, sortAscending) {
-                            playlistTracksRaw.sortedByMode(sortMode, sortAscending)
-                        }
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
                         Column(modifier = Modifier.fillMaxSize()) {
                             Row(
@@ -1481,13 +1448,8 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                                             onRemoveFromPlaylist = {
                                                 viewModel.removeTrackFromPlaylist(selectedPlaylist!!.id, track.id)
                                             },
-<<<<<<< HEAD
                                             isCurrentlyPlaying = track.isSameTrack(currentTrack),
                                             isPlayingActive = isPlaying && track.isSameTrack(currentTrack)
-=======
-                                            isCurrentlyPlaying = currentTrack?.id == track.id,
-                                            isPlayingActive = isPlaying && currentTrack?.id == track.id
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                                         )
                                     }
                                 }
@@ -2061,7 +2023,6 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
     }
 
     if (trackToAddToPlaylist != null) {
-<<<<<<< HEAD
         val targetTrack = trackToAddToPlaylist!!
         AddTrackToPlaylistDialog(
             track = targetTrack,
@@ -2085,18 +2046,6 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
                 trackToAddToPlaylist = null
-=======
-        AddTrackToPlaylistDialog(
-            track = trackToAddToPlaylist!!,
-            playlists = playlists,
-            onDismiss = { trackToAddToPlaylist = null },
-            onPlaylistSelected = { playlistId ->
-                viewModel.addTrackToPlaylist(playlistId, trackToAddToPlaylist!!.id)
-                trackToAddToPlaylist = null
-            },
-            onCreatePlaylistInline = { name ->
-                viewModel.createPlaylist(name)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             }
         )
     }
@@ -2125,7 +2074,6 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                 showBulkPlaylistDialog = false
                 selection.exit()
             },
-<<<<<<< HEAD
             onCreatePlaylistInline = { name ->
                 val chosenTracks = when (selection.kind) {
                     SelectionKind.SONG -> allTracksRaw.filter { it.uri in selection.selectedKeys }
@@ -2138,9 +2086,6 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                 showBulkPlaylistDialog = false
                 selection.exit()
             }
-=======
-            onCreatePlaylistInline = { name -> viewModel.createPlaylist(name) }
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         )
     }
 
@@ -2475,13 +2420,8 @@ fun ColumnScope.TrackList(
                 onEditTags = onEditTags,
                 selection = selection,
                 selectionContext = selectionContext,
-<<<<<<< HEAD
                 isCurrentlyPlaying = track.isSameTrack(currentTrack),
                 isPlayingActive = isPlaying && track.isSameTrack(currentTrack)
-=======
-                isCurrentlyPlaying = currentTrack?.id == track.id,
-                isPlayingActive = isPlaying && currentTrack?.id == track.id
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             )
         }
     }
@@ -2632,7 +2572,6 @@ fun TrackItemRow(
 @Composable
 private fun MiniBeatVisualizer(viewModel: AudioViewModel) {
     val bars by viewModel.waveformAmplitudes.collectAsState()
-<<<<<<< HEAD
     val isPlaying by viewModel.isPlaying.collectAsState()
     val sample = remember(bars, isPlaying) {
         if (!isPlaying) {
@@ -2646,17 +2585,6 @@ private fun MiniBeatVisualizer(viewModel: AudioViewModel) {
                 bars.getOrElse(21) { 0.25f }
             )
         }
-=======
-    val sample = remember(bars) {
-        // Pick a few bands across the spectrum for a tight equalizer look
-        listOf(
-            bars.getOrElse(2) { 0.2f },
-            bars.getOrElse(6) { 0.35f },
-            bars.getOrElse(11) { 0.5f },
-            bars.getOrElse(16) { 0.35f },
-            bars.getOrElse(21) { 0.25f }
-        )
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     }
 
     Row(
@@ -2667,11 +2595,7 @@ private fun MiniBeatVisualizer(viewModel: AudioViewModel) {
         verticalAlignment = Alignment.Bottom
     ) {
         sample.forEach { amp ->
-<<<<<<< HEAD
             val h = if (!isPlaying) 3.dp else (amp.coerceIn(0.12f, 1f) * 18f).dp
-=======
-            val h = (amp.coerceIn(0.12f, 1f) * 18f).dp
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             Box(
                 modifier = Modifier
                     .width(3.dp)
@@ -2679,11 +2603,7 @@ private fun MiniBeatVisualizer(viewModel: AudioViewModel) {
                     .clip(RoundedCornerShape(1.dp))
                     .background(
                         Brush.verticalGradient(
-<<<<<<< HEAD
                             colors = if (isPlaying) listOf(GlassCyan, GlassPurple) else listOf(Color.White.copy(alpha = 0.25f), Color.White.copy(alpha = 0.12f))
-=======
-                            colors = listOf(GlassCyan, GlassPurple)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                         )
                     )
             )
@@ -2922,12 +2842,8 @@ private fun PopupCoverBlurThumb(track: AudioTrackEntity) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(track.albumArtUri)
-<<<<<<< HEAD
                     .transformations(CleanArtworkTransformation())
                     .size(Size(128, 128))
-=======
-                    .size(Size(96, 96))
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     .crossfade(false)
                     .allowHardware(true)
                     .build(),
@@ -3181,13 +3097,8 @@ fun GroupDetailsView(
                         customQueue = tracks,
                         selection = selection,
                         selectionContext = selectionContext,
-<<<<<<< HEAD
                         isCurrentlyPlaying = track.isSameTrack(currentTrack),
                         isPlayingActive = isPlaying && track.isSameTrack(currentTrack)
-=======
-                        isCurrentlyPlaying = currentTrack?.id == track.id,
-                        isPlayingActive = isPlaying && currentTrack?.id == track.id
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     )
                 }
             }
@@ -3623,14 +3534,9 @@ fun AlbumArtThumb(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(track.albumArtUri)
-<<<<<<< HEAD
                     .transformations(CleanArtworkTransformation())
                     .size(Size(256, 256))
                     .crossfade(true)
-=======
-                    .size(Size(128, 128))
-                    .crossfade(false)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     .allowHardware(true)
                     .build(),
                 contentDescription = track.title,
@@ -3657,19 +3563,12 @@ fun MainPlayerView(viewModel: AudioViewModel) {
     val playbackDuration by viewModel.playbackDuration.collectAsState()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
-<<<<<<< HEAD
     val playbackMode by viewModel.playbackMode.collectAsState()
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     val volume by viewModel.volume.collectAsState()
     val equalizerBands by viewModel.equalizerBands.collectAsState()
     val equalizerEnabled by viewModel.equalizerEnabled.collectAsState()
     val sleepRemaining by viewModel.sleepTimerRemainingMs.collectAsState()
     val isFetchingLyrics by viewModel.isFetchingLyrics.collectAsState()
-<<<<<<< HEAD
-=======
-    val waveformAmplitudes by viewModel.waveformAmplitudes.collectAsState()
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     val playbackPosition by viewModel.playbackPosition.collectAsState()
     val context = LocalContext.current
 
@@ -3777,19 +3676,11 @@ fun MainPlayerView(viewModel: AudioViewModel) {
             // Track detail top title
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-<<<<<<< HEAD
                     text = if (track.isYouTubeTrack()) "YOUTUBE MUSIC" else "NOW PLAYING",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,
                     color = if (track.isYouTubeTrack()) Color(0xFFFF0033) else GlassCyan
-=======
-                    text = "NOW PLAYING",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp,
-                    color = GlassCyan
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -3809,7 +3700,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                 )
             }
 
-<<<<<<< HEAD
             if (track.isYouTubeTrack()) {
                 val videoId = track.youtubeVideoId().orEmpty()
                 YouTubeMusicGlassPlayer(
@@ -3925,117 +3815,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                 viewModel = viewModel,
                 playbackDuration = playbackDuration,
                 modifier = Modifier.padding(horizontal = 4.dp)
-=======
-            // Center section: Rotated offset background glow plate, rotating artwork, and vinyl spindle
-            // Swipe left/right on the vinyl to skip tracks
-            var vinylDragAccum by remember { mutableFloatStateOf(0f) }
-            Box(
-                modifier = Modifier
-                    .size(200.dp)
-                    .pointerInput(track.id) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                when {
-                                    vinylDragAccum < -80f -> viewModel.nextTrack()
-                                    vinylDragAccum > 80f -> viewModel.previousTrack()
-                                }
-                                vinylDragAccum = 0f
-                            },
-                            onDragCancel = { vinylDragAccum = 0f },
-                            onHorizontalDrag = { _, dragAmount ->
-                                vinylDragAccum += dragAmount
-                            }
-                        )
-                    }
-                    .drawBehind {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(GlassCyan.copy(alpha = 0.3f), Color.Transparent),
-                                radius = 130.dp.toPx()
-                            )
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                // Rotated gradient back-plate layer from the design theme spec
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(0.92f)
-                        .rotate(6f)
-                        .clip(RoundedCornerShape(36.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(GlassMagenta.copy(alpha = 0.45f), GlassCyan.copy(alpha = 0.35f))
-                            )
-                        )
-                )
-
-                // Rotating vinyl — only animate while playing to save CPU when paused
-                val rotation = remember { Animatable(0f) }
-                LaunchedEffect(isPlaying) {
-                    if (isPlaying) {
-                        while (true) {
-                            val next = rotation.value + 360f
-                            rotation.animateTo(
-                                targetValue = next,
-                                animationSpec = tween(durationMillis = 12_000, easing = LinearEasing)
-                            )
-                            // Keep value bounded so it doesn't grow forever
-                            rotation.snapTo(rotation.value % 360f)
-                        }
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(0.88f)
-                        .rotate(rotation.value)
-                        .clip(CircleShape)
-                        .border(4.dp, GlassBorderWhite, CircleShape)
-                        .border(8.dp, Color.Black.copy(alpha = 0.6f), CircleShape)
-                ) {
-                    AlbumArtThumb(
-                        track = track,
-                        modifier = Modifier.fillMaxSize(),
-                        corner = 100.dp
-                    )
-
-                    // Vinyl grooves effect
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                for (r in listOf(30, 50, 70, 90)) {
-                                    drawCircle(
-                                        color = Color.White.copy(alpha = 0.12f),
-                                        radius = r.dp.toPx(),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
-                                    )
-                                }
-                            }
-                    )
-                }
-
-                // Center spindle
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black)
-                        .border(2.dp, GlassCyan, CircleShape)
-                )
-            }
-
-            // Waveform Seek Bar (replaces flat slider)
-            val waveformAmps by viewModel.waveformAmplitudes.collectAsState()
-            val position by viewModel.playbackPosition.collectAsState()
-            WaveformSeekBar(
-                amplitudes = waveformAmps,
-                positionMs = position,
-                durationMs = playbackDuration,
-                onSeek = { viewModel.seekTo(it) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             )
 
             // Action controllers row
@@ -4045,20 +3824,12 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-<<<<<<< HEAD
                     onClick = { haptic(); viewModel.toggleShuffle() },
-=======
-                    onClick = { viewModel.toggleShuffle() },
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     modifier = Modifier.testTag("shuffle_button")
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Shuffle,
-<<<<<<< HEAD
                         contentDescription = if (isShuffleEnabled) "Shuffle active" else "Shuffle off",
-=======
-                        contentDescription = "Shuffle",
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                         tint = if (isShuffleEnabled) GlassCyan else Color.White.copy(alpha = 0.5f),
                         modifier = Modifier.size(22.dp)
                     )
@@ -4098,7 +3869,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                 }
 
                 IconButton(
-<<<<<<< HEAD
                     onClick = { haptic(); viewModel.cyclePlaybackMode() },
                     modifier = Modifier
                         .testTag("loop_button")
@@ -4132,27 +3902,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                         PlaybackMode.SHUFFLE_REPEAT_ALL -> Icon(
                             imageVector = Icons.Rounded.Repeat,
                             contentDescription = "Shuffle Repeat All",
-=======
-                    onClick = { viewModel.toggleLoop() },
-                    modifier = Modifier.testTag("loop_button")
-                ) {
-                    when (repeatMode) {
-                        RepeatMode.OFF -> Icon(
-                            imageVector = Icons.Rounded.Repeat,
-                            contentDescription = "Repeat off",
-                            tint = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        RepeatMode.ALL -> Icon(
-                            imageVector = Icons.Rounded.Repeat,
-                            contentDescription = "Repeat all",
-                            tint = GlassCyan,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        RepeatMode.ONE -> Icon(
-                            imageVector = Icons.Rounded.RepeatOne,
-                            contentDescription = "Repeat one",
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                             tint = GlassCyan,
                             modifier = Modifier.size(22.dp)
                         )
@@ -4232,7 +3981,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-<<<<<<< HEAD
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -4283,54 +4031,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                             tint = if (track.isFavorite) GlassMagenta else Color.White.copy(alpha = 0.5f)
                         )
                     }
-=======
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AssistChip(
-                    onClick = {
-                        val nextMood = nextMood(track.mood)
-                        viewModel.setMood(track.id, nextMood)
-                    },
-                    label = {
-                        val mood = track.mood.ifBlank { "Unassigned" }
-                        Text("Mood: ${moodEmoji(mood)} $mood")
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = GlassMagenta.copy(alpha = 0.18f),
-                        labelColor = Color.White
-                    )
-                )
-                AssistChip(
-                    onClick = { showExtras = !showExtras },
-                    label = { Text(if (showExtras) "Hide extras" else "EQ / Speed / Timer") },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = GlassPurple.copy(alpha = 0.2f),
-                        labelColor = Color.White
-                    )
-                )
-                AssistChip(
-                    onClick = { showLyrics = !showLyrics },
-                    label = { Text("Lyrics") },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = GlassMagenta.copy(alpha = 0.2f),
-                        labelColor = Color.White
-                    )
-                )
-                IconButton(onClick = { haptic(); viewModel.toggleFavorite(track) }) {
-                    Icon(
-                        imageVector = if (track.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (track.isFavorite) GlassMagenta else Color.White.copy(alpha = 0.5f)
-                    )
-                }
-                // Drive Mode button
-                IconButton(onClick = { haptic(); showDrivingMode = true }) {
-                    Icon(
-                        imageVector = Icons.Rounded.DirectionsCar,
-                        contentDescription = "Driving Mode",
-                        tint = GlassCyan.copy(alpha = 0.8f)
-                    )
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 }
             }
 
@@ -4877,7 +4577,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
         )
 
         if (queueTrackToAdd != null) {
-<<<<<<< HEAD
             val targetTrack = queueTrackToAdd!!
             AddTrackToPlaylistDialog(
                 track = targetTrack,
@@ -4899,18 +4598,6 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
                     queueTrackToAdd = null
-=======
-            AddTrackToPlaylistDialog(
-                track = queueTrackToAdd!!,
-                playlists = playlists,
-                onDismiss = { queueTrackToAdd = null },
-                onPlaylistSelected = { playlistId ->
-                    viewModel.addTrackToPlaylist(playlistId, queueTrackToAdd!!.id)
-                    queueTrackToAdd = null
-                },
-                onCreatePlaylistInline = { name ->
-                    viewModel.createPlaylist(name)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 }
             )
         }
@@ -5294,13 +4981,8 @@ fun InteractiveQueueView(
                             .testTag("queue_tracklist"),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-<<<<<<< HEAD
                         itemsIndexed(tracks, key = { index, t -> "${t.id}_${t.folderName}_${t.category}_$index" }) { index, track ->
                             val isCurrentlyPlaying = track.isSameTrack(currentTrack)
-=======
-                        itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
-                            val isCurrentlyPlaying = currentTrack?.id == track.id
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                             var showMenu by remember { mutableStateOf(false) }
                             var isDragging by remember { mutableStateOf(false) }
                             val rowHeight = 58f // approx dp per row
@@ -5398,7 +5080,6 @@ fun InteractiveQueueView(
                                         )
                                     }
 
-<<<<<<< HEAD
                                     IconButton(
                                         onClick = { onAddToPlaylist(track) },
                                         modifier = Modifier.size(28.dp)
@@ -5413,8 +5094,6 @@ fun InteractiveQueueView(
 
                                     Spacer(modifier = Modifier.width(4.dp))
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                                     Text(
                                         text = formatDuration(track.durationMs),
                                         color = Color.White.copy(alpha = 0.4f),
@@ -5440,11 +5119,7 @@ fun InteractiveQueueView(
                 }
             }
         } else {
-<<<<<<< HEAD
             val currentIdx = tracks.indexOfFirst { it.isSameTrack(currentTrack) }
-=======
-            val currentIdx = tracks.indexOfFirst { it.id == currentTrack?.id }
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             val nextTrack = if (currentIdx != -1 && currentIdx + 1 < tracks.size) tracks[currentIdx + 1] else null
 
             if (nextTrack != null) {
@@ -5489,10 +5164,7 @@ fun InteractiveQueueView(
 @Composable
 private fun NowPlayingWaveform(viewModel: AudioViewModel) {
     val visualizerBars by viewModel.waveformAmplitudes.collectAsState()
-<<<<<<< HEAD
     val isPlaying by viewModel.isPlaying.collectAsState()
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -5502,7 +5174,6 @@ private fun NowPlayingWaveform(viewModel: AudioViewModel) {
         verticalAlignment = Alignment.Bottom
     ) {
         visualizerBars.forEach { amplitude ->
-<<<<<<< HEAD
             val barFraction = if (isPlaying) amplitude.coerceIn(0.08f, 1f) else 0.08f
             Box(
                 modifier = Modifier
@@ -5512,16 +5183,6 @@ private fun NowPlayingWaveform(viewModel: AudioViewModel) {
                     .background(
                         Brush.verticalGradient(
                             colors = if (isPlaying) listOf(GlassCyan, GlassPurple) else listOf(Color.White.copy(alpha = 0.25f), Color.White.copy(alpha = 0.12f))
-=======
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(amplitude)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(GlassCyan, GlassPurple)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                         )
                     )
             )
@@ -5532,7 +5193,6 @@ private fun NowPlayingWaveform(viewModel: AudioViewModel) {
 @Composable
 private fun NowPlayingSeekBar(
     viewModel: AudioViewModel,
-<<<<<<< HEAD
     playbackDuration: Long,
     modifier: Modifier = Modifier
 ) {
@@ -5548,15 +5208,6 @@ private fun NowPlayingSeekBar(
         var sliderValueOverride by remember { mutableStateOf<Float?>(null) }
         val currentSliderValue = sliderValueOverride
             ?: (if (effectiveDuration > 0) currentPosition.toFloat() / effectiveDuration else 0f)
-=======
-    playbackDuration: Long
-) {
-    val playbackPosition by viewModel.playbackPosition.collectAsState()
-    Column(modifier = Modifier.fillMaxWidth()) {
-        var sliderValueOverride by remember { mutableStateOf<Float?>(null) }
-        val currentSliderValue = sliderValueOverride
-            ?: (if (playbackDuration > 0) playbackPosition.toFloat() / playbackDuration else 0f)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
         Slider(
             value = currentSliderValue.coerceIn(0f, 1f),
@@ -5565,13 +5216,9 @@ private fun NowPlayingSeekBar(
             },
             onValueChangeFinished = {
                 sliderValueOverride?.let { factor ->
-<<<<<<< HEAD
                     if (effectiveDuration > 0) {
                         viewModel.seekTo((factor * effectiveDuration).toLong())
                     }
-=======
-                    viewModel.seekTo((factor * playbackDuration).toLong())
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 }
                 sliderValueOverride = null
             },
@@ -5588,7 +5235,6 @@ private fun NowPlayingSeekBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-<<<<<<< HEAD
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -5598,17 +5244,6 @@ private fun NowPlayingSeekBar(
                         (sliderValueOverride!! * effectiveDuration).toLong()
                     } else {
                         currentPosition
-=======
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatDuration(
-                    if (sliderValueOverride != null) {
-                        (sliderValueOverride!! * playbackDuration).toLong()
-                    } else {
-                        playbackPosition
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     }
                 ),
                 fontSize = 11.sp,
@@ -5616,11 +5251,7 @@ private fun NowPlayingSeekBar(
                 color = Color.White.copy(alpha = 0.6f)
             )
             Text(
-<<<<<<< HEAD
                 text = formatSeekTime(effectiveDuration),
-=======
-                text = formatDuration(playbackDuration),
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 color = Color.White.copy(alpha = 0.6f)
@@ -5629,7 +5260,6 @@ private fun NowPlayingSeekBar(
     }
 }
 
-<<<<<<< HEAD
 private fun formatSeekTime(ms: Long): String {
     val totalSec = (ms / 1000).coerceAtLeast(0)
     val hours = totalSec / 3600
@@ -5642,8 +5272,6 @@ private fun formatSeekTime(ms: Long): String {
     }
 }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 // Utility to format duration in MM:SS
 private fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000
@@ -6061,7 +5689,7 @@ fun AboutDialog(onDismiss: () -> Unit, strings: LanguageStrings) {
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("GlassPlayer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                    Text("${strings.version} 1.2.2", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("${strings.version} 2.0", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
 
                 Text(

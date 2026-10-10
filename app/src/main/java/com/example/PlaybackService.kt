@@ -70,27 +70,17 @@ class PlaybackService : Service() {
             }
         }
 
-        // Sticky restart / ensure with nothing to play — do not linger as an empty FGS
-<<<<<<< HEAD
+        // Always promote to foreground first to fulfill startForegroundService requirements on API 31+
+        promoteToForeground(engine)
+
+        // Only stop if there is truly no track AND playback is not active
         if (engine.currentTrack.value == null && !engine.isPlaying.value) {
-=======
-        if (engine.currentTrack.value == null) {
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             tearDownForeground()
-            // Avoid leaving an idle engine (visualizer loop) after sticky restart
-            if (intent?.action == null || intent.action == ACTION_ENSURE_FOREGROUND) {
-                try {
-                    PlayerEngine.getOrNull()?.release()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Idle engine release failed", e)
-                }
-            }
             stopSelf()
             return START_NOT_STICKY
         }
 
         ensureObserving(engine)
-        promoteToForeground(engine)
         return START_STICKY
     }
 
@@ -156,21 +146,6 @@ class PlaybackService : Service() {
     }
 
     private fun promoteToForeground(engine: PlayerEngine) {
-<<<<<<< HEAD
-        val notification = buildNotification(this, engine)
-        try {
-            startAsForeground(notification)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start/update foreground", e)
-            try {
-                // Always ensure startForeground is attempted to prevent Android 12+ FGS crashes
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                    startForeground(NOTIFICATION_ID, notification)
-                } else {
-                    val nm = getSystemService(NotificationManager::class.java)
-                    nm.notify(NOTIFICATION_ID, notification)
-                }
-=======
         try {
             startAsForeground(buildNotification(this, engine))
         } catch (e: Exception) {
@@ -178,7 +153,6 @@ class PlaybackService : Service() {
             try {
                 val nm = getSystemService(NotificationManager::class.java)
                 nm.notify(NOTIFICATION_ID, buildNotification(this, engine))
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             } catch (inner: Exception) {
                 Log.e(TAG, "Notification fallback failed", inner)
             }

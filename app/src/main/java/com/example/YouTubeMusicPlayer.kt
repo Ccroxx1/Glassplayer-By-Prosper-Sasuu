@@ -531,57 +531,6 @@ fun YouTubeMusicGlassPlayer(
             .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Glass Brand Badge for YouTube Music
-        Row(
-            modifier = Modifier
-                .padding(bottom = 10.dp)
-                .background(
-                    color = Color(0xFFFF0033).copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(20.dp)
-                )
-                .border(
-                    width = 1.dp,
-                    color = Color(0xFFFF0033).copy(alpha = 0.38f),
-                    shape = RoundedCornerShape(20.dp)
-                )
-                .padding(horizontal = 14.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFF0033)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(11.dp)
-                )
-            }
-            Text(
-                text = "YouTube Music",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                color = Color.White
-            )
-            Text(
-                text = "• Glass Player",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.65f)
-            )
-
-            if (isPlaying) {
-                Spacer(modifier = Modifier.width(2.dp))
-                AnimatedEqualizerBars()
-            }
-        }
-
         // Main Glass Player Outer Glow Box (16:9 aspect ratio cleanly matches video artwork)
         Box(
             modifier = Modifier

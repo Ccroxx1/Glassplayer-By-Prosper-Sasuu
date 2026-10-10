@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 ﻿The term '.\gradlew.bat' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
-=======
-﻿The term '.\gradlew.bat' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e

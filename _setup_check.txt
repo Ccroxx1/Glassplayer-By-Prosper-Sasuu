@@ -1,11 +1,4 @@
-<<<<<<< HEAD
 ﻿jar=True
 jarSize=45457
 bat=True
 batSize=2844
-=======
-﻿jar=True
-jarSize=45457
-bat=True
-batSize=2844
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e

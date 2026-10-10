@@ -357,22 +357,25 @@ object OnlineMusicService {
         val tracks = mutableListOf<OnlineTrack>()
         extractInnertubeVideoItems(json, tracks, title)
 
-        // Parse continuation tokens iteratively until no more tokens or max tracks (e.g. 2000) reached
+        // Iterative Continuation Pagination Loop supporting up to 2,000 tracks
         var continuationToken = findContinuationToken(json)
-        val fetchedTokens = mutableSetOf<String>()
-        while (continuationToken.isNotBlank() && !fetchedTokens.contains(continuationToken) && tracks.size < 2000) {
-            fetchedTokens.add(continuationToken)
-            val beforeSize = tracks.size
-            val continuationJson = fetchInnertubeContinuationJson(continuationToken)
-            if (continuationJson != null) {
-                extractInnertubeVideoItems(continuationJson, tracks, title)
-                continuationToken = findContinuationToken(continuationJson)
-                if (tracks.size == beforeSize) {
-                    break
-                }
-            } else {
-                break
-            }
+        val visitedTokens = mutableSetOf<String>()
+        var maxPages = 25 // Cap at 25 continuation pages (~2,500 tracks max)
+
+        while (!continuationToken.isNullOrBlank() && tracks.size < 2000 && maxPages > 0) {
+            if (visitedTokens.contains(continuationToken)) break
+            visitedTokens.add(continuationToken)
+
+            val nextJson = fetchInnertubeContinuationJson(continuationToken) ?: break
+            val previousTrackCount = tracks.size
+
+            extractInnertubeVideoItems(nextJson, tracks, title)
+
+            // Break if no new tracks were added to prevent infinite loops
+            if (tracks.size == previousTrackCount) break
+
+            continuationToken = findContinuationToken(nextJson)
+            maxPages--
         }
 
         if (tracks.isEmpty()) return null
@@ -387,35 +390,67 @@ object OnlineMusicService {
         )
     }
 
-    private fun findContinuationToken(node: Any): String {
+    /** Recursive helper to traverse JSON and locate valid Innertube continuation tokens at any depth. */
+    fun findContinuationToken(node: Any): String? {
         when (node) {
             is JSONObject -> {
-                if (node.has("continuationCommand")) {
-                    val cc = node.optJSONObject("continuationCommand")
-                    val token = cc?.optString("token", "") ?: ""
-                    if (token.isNotBlank()) return token
+                // Check direct continuation structures first
+                if (node.has("continuationItemRenderer")) {
+                    val cir = node.optJSONObject("continuationItemRenderer")
+                    val token = cir?.let { findContinuationToken(it) }
+                    if (!token.isNullOrBlank()) return token
                 }
+                if (node.has("continuationEndpoint")) {
+                    val ep = node.optJSONObject("continuationEndpoint")
+                    val cmd = ep?.optJSONObject("continuationCommand")
+                    val token = cmd?.optString("token", "") ?: ""
+                    if (isValidContinuationToken(token)) return token
+                }
+                if (node.has("continuationCommand")) {
+                    val cmd = node.optJSONObject("continuationCommand")
+                    val token = cmd?.optString("token", "") ?: ""
+                    if (isValidContinuationToken(token)) return token
+                }
+                if (node.has("nextContinuationData")) {
+                    val ncd = node.optJSONObject("nextContinuationData")
+                    val token = ncd?.optString("continuation", "") ?: ""
+                    if (isValidContinuationToken(token)) return token
+                }
+                if (node.has("continuationData")) {
+                    val cd = node.optJSONObject("continuationData")
+                    val token = cd?.optString("continuation", "") ?: ""
+                    if (isValidContinuationToken(token)) return token
+                }
+
+                // Fallback recursive key traversal
                 val keys = node.keys()
                 while (keys.hasNext()) {
-                    val k = keys.next()
-                    val child = node.opt(k)
-                    if (child != null) {
-                        val token = findContinuationToken(child)
-                        if (token.isNotBlank()) return token
+                    val key = keys.next()
+                    val child = node.opt(key) ?: continue
+
+                    if ((key == "token" || key == "continuation") && child is String) {
+                        if (isValidContinuationToken(child) && (node.has("command") || node.has("clickTrackingParams") || key == "continuation")) {
+                            return child
+                        }
                     }
+
+                    val token = findContinuationToken(child)
+                    if (!token.isNullOrBlank()) return token
                 }
             }
             is JSONArray -> {
                 for (i in 0 until node.length()) {
-                    val item = node.opt(i)
-                    if (item != null) {
-                        val token = findContinuationToken(item)
-                        if (token.isNotBlank()) return token
-                    }
+                    val item = node.opt(i) ?: continue
+                    val token = findContinuationToken(item)
+                    if (!token.isNullOrBlank()) return token
                 }
             }
         }
-        return ""
+        return null
+    }
+
+    private fun isValidContinuationToken(token: String): Boolean {
+        return token.isNotBlank() && token.length >= 10 && !token.contains("{") && !token.contains("}") && !token.contains(" ") && !token.contains("[") && !token.contains("]")
     }
 
     private fun fetchInnertubeContinuationJson(token: String): JSONObject? {
@@ -426,6 +461,8 @@ object OnlineMusicService {
                     put("client", JSONObject().apply {
                         put("clientName", "WEB")
                         put("clientVersion", "2.20240101.00.00")
+                        put("hl", "en")
+                        put("gl", "US")
                     })
                 })
                 put("continuation", token)
@@ -436,7 +473,7 @@ object OnlineMusicService {
                 connectTimeout = 8000
                 readTimeout = 8000
                 doOutput = true
-                setRequestProperty("User-Agent", "Mozilla/5.0")
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                 setRequestProperty("Content-Type", "application/json")
             }
 
@@ -452,7 +489,7 @@ object OnlineMusicService {
                 conn.disconnect()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error fetching Innertube continuation JSON", e)
+            Log.w(TAG, "Error fetching Innertube continuation tracks", e)
         }
         return null
     }
@@ -536,6 +573,72 @@ object OnlineMusicService {
                     val lengthText = pvr?.optJSONObject("lengthText")?.optString("simpleText", "3:30") ?: "3:30"
 
                     if (videoId.isNotBlank() && title.isNotBlank() && videoId.length == 11) {
+                        if (list.none { it.id == videoId }) {
+                            val durationMs = parseDurationTextToMs(lengthText)
+                            list.add(
+                                OnlineTrack(
+                                    id = videoId,
+                                    title = title,
+                                    artist = artist,
+                                    durationText = lengthText,
+                                    durationMs = durationMs,
+                                    thumbnail = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+                                    views = "YouTube",
+                                    mood = playlistTitle,
+                                    webLink = "https://www.youtube.com/watch?v=$videoId",
+                                    source = "YouTube"
+                                )
+                            )
+                        }
+                    }
+                    return
+                }
+
+                if (node.has("musicResponsiveListItemRenderer")) {
+                    val mrlir = node.optJSONObject("musicResponsiveListItemRenderer")
+                    var videoId = mrlir?.optJSONObject("playlistItemData")?.optString("videoId", "") ?: ""
+
+                    if (videoId.isBlank()) {
+                        val mrlirStr = mrlir?.toString() ?: ""
+                        if (mrlirStr.contains("watchEndpoint")) {
+                            videoId = mrlirStr.substringAfter("\"videoId\":\"").substringBefore("\"")
+                            if (videoId.contains("{") || videoId.length != 11) videoId = ""
+                        }
+                    }
+
+                    var title = ""
+                    var artist = "YouTube Artist"
+                    val flexColumns = mrlir?.optJSONArray("flexColumns")
+                    if (flexColumns != null && flexColumns.length() > 0) {
+                        val col0 = flexColumns.optJSONObject(0)?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                        val runs0 = col0?.optJSONObject("text")?.optJSONArray("runs")
+                        if (runs0 != null && runs0.length() > 0) {
+                            title = runs0.optJSONObject(0)?.optString("text", "") ?: ""
+                        }
+
+                        if (flexColumns.length() > 1) {
+                            val col1 = flexColumns.optJSONObject(1)?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                            val runs1 = col1?.optJSONObject("text")?.optJSONArray("runs")
+                            if (runs1 != null && runs1.length() > 0) {
+                                artist = runs1.optJSONObject(0)?.optString("text", "YouTube Artist") ?: "YouTube Artist"
+                            }
+                        }
+                    }
+
+                    var lengthText = "3:30"
+                    val fixedColumns = mrlir?.optJSONArray("fixedColumns")
+                    if (fixedColumns != null && fixedColumns.length() > 0) {
+                        val fcol0 = fixedColumns.optJSONObject(0)?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
+                        val runs = fcol0?.optJSONObject("text")?.optJSONArray("runs")
+                        if (runs != null && runs.length() > 0) {
+                            val txt = runs.optJSONObject(0)?.optString("text", "") ?: ""
+                            if (txt.contains(":") || txt.all { it.isDigit() }) {
+                                lengthText = txt
+                            }
+                        }
+                    }
+
+                    if (videoId.isNotBlank() && videoId.length == 11 && title.isNotBlank()) {
                         if (list.none { it.id == videoId }) {
                             val durationMs = parseDurationTextToMs(lengthText)
                             list.add(
@@ -675,7 +778,7 @@ object OnlineMusicService {
             emptyList()
         }
 
-    /** Resolves the full duration audio stream URL via RapidAPI YTStream */
+    /** Resolves the full duration audio stream URL via RapidAPI YTStream or Piped fallback */
     suspend fun resolveStreamUrl(videoId: String): String? =
         withContext(Dispatchers.IO) {
             val cached = streamCache[videoId]
@@ -683,6 +786,7 @@ object OnlineMusicService {
                 return@withContext cached
             }
 
+            // 1. Primary: RapidAPI YTStream (highest bitrate selection for HD quality)
             val dlUrl = "https://$RAPID_API_HOST/dl?id=$videoId"
             try {
                 val conn = (URL(dlUrl).openConnection() as HttpURLConnection).apply {
@@ -707,12 +811,11 @@ object OnlineMusicService {
                         val f = formats.optJSONObject(i) ?: continue
                         val mime = f.optString("mimeType", "")
                         if (mime.contains("audio", ignoreCase = true)) {
-                            val itag = f.optInt("itag", 0)
                             val bitrate = f.optLong("bitrate", 0L)
                             val url = f.optString("url", "")
                             if (url.isNotBlank()) {
-                                // Prefer itag 140 (AAC) or highest bitrate
-                                if (itag == 140 || bestAudioUrl == null || bitrate > highestBitrate) {
+                                // Strictly select highest bitrate for HD sound quality
+                                if (bestAudioUrl == null || bitrate > highestBitrate) {
                                     bestAudioUrl = url
                                     highestBitrate = bitrate
                                 }
@@ -723,7 +826,7 @@ object OnlineMusicService {
                     if (!bestAudioUrl.isNullOrBlank()) {
                         val finalUrl = followRedirectIfNeeded(bestAudioUrl)
                         streamCache[videoId] = finalUrl
-                        Log.d(TAG, "Successfully resolved audio stream for $videoId (bitrate $highestBitrate)")
+                        Log.d(TAG, "Successfully resolved HD audio stream for $videoId (bitrate $highestBitrate)")
                         return@withContext finalUrl
                     }
                 } else {
@@ -732,10 +835,67 @@ object OnlineMusicService {
                     Log.e(TAG, "RapidAPI YTStream failed: HTTP ${conn.responseCode} - $err")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error resolving audio stream for $videoId", e)
+                Log.e(TAG, "Error resolving audio stream for $videoId via RapidAPI", e)
             }
+
+            // 2. Fallback: Piped HD Audio Stream Resolver
+            val pipedUrl = resolveAudioStreamFromPiped(videoId)
+            if (!pipedUrl.isNullOrBlank()) {
+                streamCache[videoId] = pipedUrl
+                return@withContext pipedUrl
+            }
+
             null
         }
+
+    private fun resolveAudioStreamFromPiped(videoId: String): String? {
+        val streamEndpoints = listOf(
+            "https://api.piped.private.coffee/streams/$videoId",
+            "https://pipedapi.tokhmi.xyz/streams/$videoId"
+        )
+
+        for (endpoint in streamEndpoints) {
+            try {
+                val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                    setRequestProperty("User-Agent", "Mozilla/5.0")
+                    setRequestProperty("Accept", "application/json")
+                }
+
+                if (conn.responseCode == 200) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    conn.disconnect()
+                    val json = JSONObject(body)
+                    val audioStreams = json.optJSONArray("audioStreams") ?: JSONArray()
+                    
+                    var bestUrl: String? = null
+                    var highestBitrate = 0L
+
+                    for (i in 0 until audioStreams.length()) {
+                        val stream = audioStreams.optJSONObject(i) ?: continue
+                        val url = stream.optString("url", "")
+                        val bitrate = stream.optLong("bitrate", 0L)
+                        if (url.isNotBlank() && (bestUrl == null || bitrate > highestBitrate)) {
+                            bestUrl = url
+                            highestBitrate = bitrate
+                        }
+                    }
+
+                    if (!bestUrl.isNullOrBlank()) {
+                        Log.d(TAG, "Successfully resolved HD audio stream from Piped for $videoId (bitrate $highestBitrate)")
+                        return bestUrl
+                    }
+                } else {
+                    conn.disconnect()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error resolving audio stream from Piped endpoint $endpoint: ${e.message}")
+            }
+        }
+        return null
+    }
 
     /** Follows 302 redirect from redirector.googlevideo.com to direct CDN node */
     private fun followRedirectIfNeeded(initialUrl: String): String {

@@ -13,11 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PlaylistEntity::class,
         PlaylistTrackCrossRefEntity::class
     ],
-<<<<<<< HEAD
     version = 8,
-=======
-    version = 7,
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     exportSchema = false
 )
 abstract class AudioDatabase : RoomDatabase() {
@@ -44,7 +40,6 @@ abstract class AudioDatabase : RoomDatabase() {
             }
         }
 
-<<<<<<< HEAD
         /**
          * v8: playlist add-order, and repair YouTube identity URIs where the video id is known.
          * Duplicate / unrepairable rows are cleaned in [AudioRepository.cleanInvalidData].
@@ -81,8 +76,6 @@ abstract class AudioDatabase : RoomDatabase() {
             }
         }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         fun getDatabase(context: Context): AudioDatabase {
             return INSTANCE ?: synchronized(this) {
                 val baseContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
@@ -95,11 +88,7 @@ abstract class AudioDatabase : RoomDatabase() {
                     AudioDatabase::class.java,
                     "audio_player_database"
                 )
-<<<<<<< HEAD
                     .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-=======
-                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance

@@ -1,9 +1,5 @@
 [versions]
-<<<<<<< HEAD
 agp = "9.4.1"
-=======
-agp = "9.4.0"
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 coreKtx = "1.18.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"

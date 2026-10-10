@@ -1,17 +1,11 @@
 package com.example
 
-<<<<<<< HEAD
 import android.util.Log
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-=======
-import androidx.room.withTransaction
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 import java.util.Calendar
 
 class AudioRepository(
@@ -36,7 +30,6 @@ class AudioRepository(
         val unmatchedCount: Int
     )
 
-<<<<<<< HEAD
     private val playlistMutex = Mutex()
 
     val allTracks: Flow<List<AudioTrackEntity>> = audioDao.getAllTracks()
@@ -45,11 +38,6 @@ class AudioRepository(
         audioDao.getRecentTracks7Days(System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L)
     val recentYouTubeTracks: Flow<List<AudioTrackEntity>> =
         audioDao.getRecentYouTubeTracks7Days(System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L)
-=======
-    val allTracks: Flow<List<AudioTrackEntity>> = audioDao.getAllTracks()
-    val favorites: Flow<List<AudioTrackEntity>> = audioDao.getFavoriteTracks()
-    val recentTracks: Flow<List<AudioTrackEntity>> = audioDao.getRecentTracks()
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     val recentlyAddedTracks: Flow<List<AudioTrackEntity>> = audioDao.getRecentlyAddedTracks()
     val mostPlayedTracks: Flow<List<AudioTrackEntity>> = audioDao.getMostPlayedTracks()
     val allPlaylists: Flow<List<PlaylistEntity>> = audioDao.getAllPlaylists()
@@ -70,7 +58,6 @@ class AudioRepository(
 
     suspend fun getTrackByUri(uri: String): AudioTrackEntity? = audioDao.getTrackByUri(uri)
 
-<<<<<<< HEAD
     private suspend fun findExistingTrack(track: AudioTrackEntity): AudioTrackEntity? {
         val ytId = track.youtubeVideoId()
         if (ytId != null) {
@@ -127,8 +114,6 @@ class AudioRepository(
         }
     }
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     /** Returns tracks for [uris] in the same order as requested (missing URIs omitted). */
     suspend fun getTracksByUrisOrdered(uris: List<String>): List<AudioTrackEntity> {
         if (uris.isEmpty()) return emptyList()
@@ -136,31 +121,6 @@ class AudioRepository(
         return uris.mapNotNull { found[it] }
     }
 
-<<<<<<< HEAD
-=======
-    suspend fun upsertTrack(track: AudioTrackEntity): Long {
-        val existing = audioDao.getTrackByUri(track.uri)
-        return if (existing != null) {
-            audioDao.updateTrackMetadata(
-                uri = track.uri,
-                title = track.title,
-                artist = track.artist,
-                durationMs = track.durationMs,
-                album = track.album,
-                folderName = track.folderName,
-                albumArtUri = track.albumArtUri,
-                category = track.category,
-                dateAdded = track.dateAdded,
-                dateModified = track.dateModified,
-                year = track.year
-            )
-            existing.id.toLong()
-        } else {
-            audioDao.insertTrack(track)
-        }
-    }
-
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     suspend fun insertTrack(track: AudioTrackEntity): Long = upsertTrack(track)
 
     /** Single Room transaction so the UI gets one Flow emit instead of one per track. */
@@ -304,7 +264,6 @@ class AudioRepository(
     }
 
     suspend fun createPlaylist(name: String): Long {
-<<<<<<< HEAD
         return playlistMutex.withLock {
             audioDao.insertPlaylist(PlaylistEntity(name = name))
         }
@@ -540,18 +499,6 @@ class AudioRepository(
                 audioDao.deleteTrackById(duplicate.id)
             }
         }
-=======
-        return audioDao.insertPlaylist(PlaylistEntity(name = name))
-    }
-
-    suspend fun deletePlaylist(playlistId: Int) {
-        audioDao.deleteCrossRefsForPlaylist(playlistId)
-        audioDao.deletePlaylist(playlistId)
-    }
-
-    suspend fun addTrackToPlaylist(playlistId: Int, trackId: Int) {
-        audioDao.insertPlaylistTrackCrossRef(PlaylistTrackCrossRefEntity(playlistId, trackId))
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     }
 
     suspend fun removeTrackFromPlaylist(playlistId: Int, trackId: Int) {
@@ -617,10 +564,7 @@ class AudioRepository(
     }
 
     companion object {
-<<<<<<< HEAD
         private const val TAG = "AudioRepository"
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         const val SYNTH_URI = "procedural://synth"
         val SYNTH_LYRICS = """
             [Neon Pulse]

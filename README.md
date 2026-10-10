@@ -1,22 +1,26 @@
-# 🎵 GlassPlayer
+# 🎵 GlassPlayer v2.0
 
 ### A modern, glassmorphism-inspired Android music player built with Jetpack Compose.
 
-<<<<<<< HEAD
-GlassPlayer is a feature-rich, high-performance Android music player designed to provide a clean, modern, and immersive listening experience for both local library files and online streaming.
+GlassPlayer is a feature-rich, high-performance Android music player designed to provide a clean, modern, and audiophile-grade listening experience for both local media files and online streaming.
 
-## ✨ Features
+---
 
-- **🎨 Glassmorphic Interface**: Stunning translucent glass cards, frosted blur effects, and dynamic color palettes that adapt to album artwork.
-- **📁 Local Music Library**: Automatic scanning of local storage (MP3, FLAC, WAV, M4A, AAC, OGG) with robust metadata extraction.
-- **🌐 YouTube & YouTube Music Streaming**: In-app streaming and link/playlist importing with robust continuation pagination supporting large playlists (up to 2,000 tracks).
-- **📂 Browsing & Smart Playlists**: Browse by Songs, Albums, Artists, Playlists, and Folders, plus Smart Playlists (*Recently Added*, *Most Played*, *Never Played*, *Long Tracks*, *Released This Year*).
-- **📝 Synced Lyrics**: Real-time LRC lyrics synchronization (`LrcLibService`).
-- **🎧 Advanced Playback Engine**: Powered by Android Media3 / ExoPlayer with gapless playback and configurable crossfade.
-- **⏱️ Sleep Timer & Equalizer**: Gradual volume fade-out sleep timer and built-in audio effects.
-- **🔔 Background Service & Lock-Screen Controls**: Persistent foreground media service (`PlaybackService`) with lock-screen transport controls and session state persistence.
+## ✨ Key Features
+
+- **🎧 HD Sound Quality Engine**: 32-bit Floating Point PCM audio output built on **Android Media3 ExoPlayer**. Preserves high dynamic range, eliminates quantization noise, and supports high-resolution lossless audio formats (FLAC, ALAC, WAV, AAC, Opus, OGG).
+- **⚡ Ultra-Fast Playback & Caching**: Optimized low-latency playback initialization with built-in **100MB LRU Disk Media Cache** (`SimpleCache` + `CacheDataSource`). Streamed tracks load instantly from disk on replay or seek with zero network delay.
+- **🌐 YouTube & YouTube Music Integration**: Seamless in-app streaming, high-bitrate audio stream selection (Opus 160kbps+, AAC 256kbps+), YouTube playlist importing, and continuation pagination.
+- **🔄 Seamless Mixed Queue Transition**: Intelligent auto-advance that smoothly transitions between online streams and local device tracks without pausing.
+- **🎨 Glassmorphic Interface**: Translucent glass cards, frosted blur reflections, and dynamic color palettes adapting to album artwork.
+- **📁 Local Music Library & Folders**: Automatic scanning of local device storage with folder blacklist management and metadata extraction.
+- **📂 Smart Playlists**: Browse by Songs, Albums, Artists, Playlists, and Folders, plus Smart Playlists (*Recently Added*, *Most Played*, *Never Played*, *Long Tracks*, *Released This Year*).
+- **📝 Synced Lyrics**: Real-time LRC lyrics synchronization powered by `LrcLibService`.
+- **🎚️ Equalizer & ReplayGain**: Built-in multi-band equalizer, per-track ReplayGain offset normalization, and gradual fade-out sleep timer.
 - **🚗 Driving Mode & Android Auto**: Simplified large touch-target driving UI and Android Auto car head unit support.
-- **📱 Widgets & Scrobbling**: Home screen app widgets and Last.fm scrobbling integration.
+- **📱 Widgets & Last.fm**: Home screen app widgets and Last.fm scrobbling integration.
+
+---
 
 ## 📱 Screenshots
 
@@ -35,72 +39,25 @@ GlassPlayer is a feature-rich, high-performance Android music player designed to
 | :---: | :---: | :---: | :---: |
 | <img src="screenshots/Youtube%20Music.png" width="220"> | <img src="screenshots/Youtube%20Music%20Search.png" width="220"> | <img src="screenshots/Youtube%20Music%20%26%20Playlist%20Link%20.png" width="220"> | <img src="screenshots/Youtube%20Music%20Now%20Playing.png" width="220"> |
 
-## 🛠️ Built With
-
-- **Kotlin** & **Jetpack Compose**
-- **Android Media3 & ExoPlayer**
-- **Room Database**
-- **Gradle & Android SDK**
-
-## 📋 Requirements
-
-- Android device or emulator running Android 8.0+
-=======
-GlassPlayer is a feature-rich Android music player designed to provide a clean, modern and immersive listening experience for local music.
-
-## ✨ Features
-
-- 🎵 Local music library
-- 🔎 Music search
-- 📂 Folder browsing
-- 📑 Playlist management
-- ▶️ Background playback
-- 🎧 Media3 / ExoPlayer audio playback
-- 🎚️ Equalizer
-- ⏱️ Sleep timer
-- 🎨 Glassmorphism-inspired interface
-- ⚡ Fast and responsive UI
-- 🔄 Media playback controls
-- 📱 Modern Android interface
-
-## 📱 Screenshots
-
-### Home Screen
-
-<img src="screenshots/Home%20screen.png" width="300">
-
-### Now Playing
-
-<img src="screenshots/Now%20Playing.png" width="300">
-
-### Playlist
-
-<img src="screenshots/Playlist.png" width="300">
-
-### Search
-
-<img src="screenshots/Search.png" width="300">
-
-### Folder
-
-<img src="screenshots/Block%20Folder.png" width="300">
+---
 
 ## 🛠️ Built With
 
-- **Kotlin**
-- **Jetpack Compose**
-- **Android Media3**
-- **ExoPlayer**
-- **Gradle**
-- **Android SDK**
+- **Kotlin** & **Jetpack Compose (Material 3)**
+- **Android Media3 & ExoPlayer 1.5.1**
+- **Room Database & DataStore Preferences**
+- **Coil Image Loading**
+- **Gradle & AGP 9**
+
+---
 
 ## 📋 Requirements
 
-- Android device or emulator
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
-- Android Studio
-- Android SDK
-- JDK compatible with the project's Gradle configuration
+- Android device or emulator running **Android 8.0+ (API level 26+)**
+- Android Studio Ladybug or newer
+- JDK 17 / 21 compatible with Gradle setup
+
+---
 
 ## 🚀 Build From Source
 
@@ -108,7 +65,11 @@ Clone the repository:
 
 ```bash
 git clone https://github.com/Ccroxx1/Glassplayer-By-Prosper-Sasuu.git
-<<<<<<< HEAD
+cd Glassplayer-By-Prosper-Sasuu
 ```
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
+
+Open the project in Android Studio and run on an Android device or emulator:
+
+```bash
+./gradlew assembleDebug
+```

@@ -35,12 +35,8 @@ data class LanguageStrings(
     val sourcesDesc: String,
     val addFolder: String,
     val rescanAll: String,
-<<<<<<< HEAD
     val done: String,
     val onlineMusic: String
-=======
-    val done: String
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 )
 
 object Localization {
@@ -79,12 +75,8 @@ object Localization {
         sourcesDesc = "GlassPlayer scans these folders for audio files. You can add multiple folders from your device or SD card.",
         addFolder = "Add Folder",
         rescanAll = "Rescan All Folders",
-<<<<<<< HEAD
         done = "Done",
         onlineMusic = "YouTube"
-=======
-        done = "Done"
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     )
 
     private val Spanish = LanguageStrings(
@@ -122,12 +114,8 @@ object Localization {
         sourcesDesc = "GlassPlayer escanea estas carpetas en busca de archivos. Puedes añadir varias carpetas.",
         addFolder = "Añadir carpeta",
         rescanAll = "Escanear todo",
-<<<<<<< HEAD
         done = "Hecho",
         onlineMusic = "YouTube"
-=======
-        done = "Hecho"
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     )
 
     private val French = LanguageStrings(
@@ -165,12 +153,8 @@ object Localization {
         sourcesDesc = "GlassPlayer scanne ces dossiers. Vous pouvez ajouter plusieurs dossiers.",
         addFolder = "Ajouter un dossier",
         rescanAll = "Tout rescanner",
-<<<<<<< HEAD
         done = "Terminé",
         onlineMusic = "YouTube"
-=======
-        done = "Terminé"
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     )
 
     fun getStrings(language: String): LanguageStrings = when (language) {

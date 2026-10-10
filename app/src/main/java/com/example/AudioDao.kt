@@ -17,7 +17,6 @@ interface AudioDao {
     @Query("SELECT * FROM audio_tracks WHERE isFavorite = 1 ORDER BY title ASC")
     fun getFavoriteTracks(): Flow<List<AudioTrackEntity>>
 
-<<<<<<< HEAD
     @Query("SELECT * FROM audio_tracks WHERE lastPlayed >= :sevenDaysAgoMs ORDER BY lastPlayed DESC LIMIT 50")
     fun getRecentTracks7Days(sevenDaysAgoMs: Long): Flow<List<AudioTrackEntity>>
 
@@ -29,10 +28,6 @@ interface AudioDao {
 
     @Query("UPDATE audio_tracks SET lastPlayed = 0 WHERE folderName = 'YouTube' AND lastPlayed > 0")
     suspend fun clearRecentYouTubeHistory()
-=======
-    @Query("SELECT * FROM audio_tracks WHERE lastPlayed > 0 ORDER BY lastPlayed DESC LIMIT 50")
-    fun getRecentTracks(): Flow<List<AudioTrackEntity>>
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
     @Query("SELECT * FROM audio_tracks WHERE dateAdded > 0 ORDER BY dateAdded DESC LIMIT 50")
     fun getRecentlyAddedTracks(): Flow<List<AudioTrackEntity>>
@@ -81,7 +76,6 @@ interface AudioDao {
     @Query("SELECT * FROM audio_tracks WHERE uri = :uri LIMIT 1")
     suspend fun getTrackByUri(uri: String): AudioTrackEntity?
 
-<<<<<<< HEAD
     @Query("SELECT * FROM audio_tracks WHERE id = :id LIMIT 1")
     suspend fun getTrackById(id: Int): AudioTrackEntity?
 
@@ -91,8 +85,6 @@ interface AudioDao {
     @Query("SELECT * FROM playlists WHERE id = :playlistId LIMIT 1")
     suspend fun getPlaylistById(playlistId: Int): PlaylistEntity?
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     @Query("SELECT * FROM audio_tracks WHERE uri IN (:uris)")
     suspend fun getTracksByUris(uris: List<String>): List<AudioTrackEntity>
 
@@ -138,7 +130,6 @@ interface AudioDao {
     @Query(
         """
         UPDATE audio_tracks SET
-<<<<<<< HEAD
             uri = :uri,
             title = :title,
             artist = :artist,
@@ -171,8 +162,6 @@ interface AudioDao {
     @Query(
         """
         UPDATE audio_tracks SET
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
             title = :title,
             artist = :artist,
             album = :album
@@ -205,12 +194,9 @@ interface AudioDao {
     @Query("DELETE FROM audio_tracks WHERE uri = :uri")
     suspend fun deleteTrackByUri(uri: String)
 
-<<<<<<< HEAD
     @Query("DELETE FROM audio_tracks WHERE id = :id")
     suspend fun deleteTrackById(id: Int)
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     @Query("SELECT * FROM audio_tracks WHERE folderName = :folderName")
     suspend fun getTracksByFolder(folderName: String): List<AudioTrackEntity>
 
@@ -233,7 +219,6 @@ interface AudioDao {
     suspend fun deletePlaylist(playlistId: Int)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-<<<<<<< HEAD
     suspend fun insertPlaylistTrackCrossRef(crossRef: PlaylistTrackCrossRefEntity): Long
 
     @Query("SELECT EXISTS(SELECT 1 FROM playlist_track_cross_ref WHERE playlistId = :playlistId AND trackId = :trackId)")
@@ -247,9 +232,6 @@ interface AudioDao {
 
     @Query("SELECT * FROM playlist_track_cross_ref")
     suspend fun getAllCrossRefs(): List<PlaylistTrackCrossRefEntity>
-=======
-    suspend fun insertPlaylistTrackCrossRef(crossRef: PlaylistTrackCrossRefEntity)
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
 
     @Query("DELETE FROM playlist_track_cross_ref WHERE playlistId = :playlistId AND trackId = :trackId")
     suspend fun deletePlaylistTrackCrossRef(playlistId: Int, trackId: Int)
@@ -259,11 +241,7 @@ interface AudioDao {
         SELECT audio_tracks.* FROM audio_tracks 
         INNER JOIN playlist_track_cross_ref ON audio_tracks.id = playlist_track_cross_ref.trackId 
         WHERE playlist_track_cross_ref.playlistId = :playlistId
-<<<<<<< HEAD
         ORDER BY playlist_track_cross_ref.position ASC, playlist_track_cross_ref.trackId ASC
-=======
-        ORDER BY audio_tracks.title ASC
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
         """
     )
     fun getTracksInPlaylist(playlistId: Int): Flow<List<AudioTrackEntity>>
@@ -273,11 +251,7 @@ interface AudioDao {
                 SELECT audio_tracks.* FROM audio_tracks 
                 INNER JOIN playlist_track_cross_ref ON audio_tracks.id = playlist_track_cross_ref.trackId 
                 WHERE playlist_track_cross_ref.playlistId = :playlistId
-<<<<<<< HEAD
                 ORDER BY playlist_track_cross_ref.position ASC, playlist_track_cross_ref.trackId ASC
-=======
-                ORDER BY audio_tracks.title ASC
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
                 """
         )
         suspend fun getTracksInPlaylistSnapshot(playlistId: Int): List<AudioTrackEntity>
@@ -294,15 +268,12 @@ interface AudioDao {
         """)
         suspend fun getTracksWithDuplicateTitles(): List<AudioTrackEntity>
 
-<<<<<<< HEAD
     @Query("DELETE FROM audio_tracks WHERE (uri = '' OR uri IS NULL) AND folderName = 'YouTube'")
     suspend fun deleteInvalidEmptyUriTracks()
 
     @Query("DELETE FROM playlist_track_cross_ref WHERE trackId NOT IN (SELECT id FROM audio_tracks)")
     suspend fun deleteOrphanCrossRefs()
 
-=======
->>>>>>> 8eae55c7096dcedd8d935cf41932467cdb84c41e
     @Query("DELETE FROM playlist_track_cross_ref WHERE playlistId = :playlistId")
     suspend fun deleteCrossRefsForPlaylist(playlistId: Int)
 
