@@ -11,6 +11,8 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.audiofx.Equalizer
+import android.media.audiofx.BassBoost
+import android.media.audiofx.Virtualizer
 import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
@@ -53,6 +55,13 @@ enum class RepeatMode {
     OFF,
     ALL,
     ONE
+}
+
+enum class VisualizerStyle {
+    BARS,
+    WAVE,
+    RADIAL,
+    NEON
 }
 
 /**
@@ -131,11 +140,75 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private val _volume = MutableStateFlow(0.7f)
     val volume: StateFlow<Float> = _volume.asStateFlow()
 
-    private val _equalizerBands = MutableStateFlow<List<Float>>(emptyList())
+    private val _equalizerBands = MutableStateFlow<List<Float>>(listOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f))
     val equalizerBands: StateFlow<List<Float>> = _equalizerBands.asStateFlow()
 
-    private val _equalizerEnabled = MutableStateFlow(false)
+    private val _equalizerEnabled = MutableStateFlow(true)
     val equalizerEnabled: StateFlow<Boolean> = _equalizerEnabled.asStateFlow()
+
+    private val _bassBoostStrength = MutableStateFlow(0f)
+    val bassBoostStrength: StateFlow<Float> = _bassBoostStrength.asStateFlow()
+
+    private val _virtualizerStrength = MutableStateFlow(0f)
+    val virtualizerStrength: StateFlow<Float> = _virtualizerStrength.asStateFlow()
+
+    private val _equalizerPreset = MutableStateFlow("Flat")
+    val equalizerPreset: StateFlow<String> = _equalizerPreset.asStateFlow()
+
+    private val _visualizerStyle = MutableStateFlow(VisualizerStyle.BARS)
+    val visualizerStyle: StateFlow<VisualizerStyle> = _visualizerStyle.asStateFlow()
+
+    fun setVisualizerStyle(style: VisualizerStyle) {
+        _visualizerStyle.value = style
+        scope.launch {
+            AppPreferencesStore(appContext).setVisualizerStyle(style)
+        }
+    }
+
+    init {
+        scope.launch(Dispatchers.IO) {
+            val store = AppPreferencesStore(appContext)
+            store.visualizerStyle.collect { style ->
+                _visualizerStyle.value = style
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            val store = AppPreferencesStore(appContext)
+            store.equalizerEnabled.collect { enabled ->
+                _equalizerEnabled.value = enabled
+                equalizer?.enabled = enabled
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            val store = AppPreferencesStore(appContext)
+            store.equalizerBands.collect { bands ->
+                if (bands.size == 5) {
+                    _equalizerBands.value = bands
+                    applyEqualizerToEffects()
+                }
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            val store = AppPreferencesStore(appContext)
+            store.bassBoostStrength.collect { str ->
+                _bassBoostStrength.value = str
+                setBassBoostStrength(str)
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            val store = AppPreferencesStore(appContext)
+            store.virtualizerStrength.collect { str ->
+                _virtualizerStrength.value = str
+                setVirtualizerStrength(str)
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            val store = AppPreferencesStore(appContext)
+            store.equalizerPreset.collect { preset ->
+                _equalizerPreset.value = preset
+            }
+        }
+    }
 
     private val _sleepTimerRemainingMs = MutableStateFlow(0L)
     val sleepTimerRemainingMs: StateFlow<Long> = _sleepTimerRemainingMs.asStateFlow()
@@ -160,6 +233,8 @@ class PlayerEngine private constructor(private val appContext: Context) {
     private val synth = ProceduralSynth()
     private var visualizer: Visualizer? = null
     private var equalizer: Equalizer? = null
+    private var bassBoost: BassBoost? = null
+    private var virtualizer: Virtualizer? = null
     private var mediaSession: MediaSessionCompat? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var hasAudioFocus = false
@@ -1775,19 +1850,98 @@ class PlayerEngine private constructor(private val appContext: Context) {
     fun setEqualizerEnabled(enabled: Boolean) {
         _equalizerEnabled.value = enabled
         equalizer?.enabled = enabled
+        bassBoost?.enabled = enabled && _bassBoostStrength.value > 0f
+        virtualizer?.enabled = enabled && _virtualizerStrength.value > 0f
+        scope.launch {
+            AppPreferencesStore(appContext).setEqualizerEnabled(enabled)
+        }
     }
 
     fun setEqualizerBand(index: Int, normalized: Float) {
+        if (index !in 0..4) return
+        val clamped = normalized.coerceIn(0f, 1f)
+        val currentBands = _equalizerBands.value.toMutableList()
+        if (index < currentBands.size) {
+            currentBands[index] = clamped
+            _equalizerBands.value = currentBands
+            _equalizerPreset.value = "Custom"
+            applyEqualizerToEffects()
+            scope.launch {
+                val store = AppPreferencesStore(appContext)
+                store.setEqualizerBands(currentBands)
+                store.setEqualizerPreset("Custom")
+            }
+        }
+    }
+
+    fun setBassBoostStrength(strength: Float) {
+        val clamped = strength.coerceIn(0f, 1f)
+        _bassBoostStrength.value = clamped
+        val bb = bassBoost
+        if (bb != null) {
+            try {
+                bb.enabled = _equalizerEnabled.value && clamped > 0f
+                bb.setStrength((clamped * 1000).toInt().toShort())
+            } catch (e: Exception) {
+                Log.w(tag, "BassBoost setStrength failed", e)
+            }
+        }
+        scope.launch {
+            AppPreferencesStore(appContext).setBassBoostStrength(clamped)
+        }
+    }
+
+    fun setVirtualizerStrength(strength: Float) {
+        val clamped = strength.coerceIn(0f, 1f)
+        _virtualizerStrength.value = clamped
+        val virt = virtualizer
+        if (virt != null) {
+            try {
+                virt.enabled = _equalizerEnabled.value && clamped > 0f
+                virt.setStrength((clamped * 1000).toInt().toShort())
+            } catch (e: Exception) {
+                Log.w(tag, "Virtualizer setStrength failed", e)
+            }
+        }
+        scope.launch {
+            AppPreferencesStore(appContext).setVirtualizerStrength(clamped)
+        }
+    }
+
+    fun applyEqualizerPreset(presetName: String) {
+        val bands = PRESETS[presetName] ?: return
+        _equalizerBands.value = bands
+        _equalizerPreset.value = presetName
+        applyEqualizerToEffects()
+        scope.launch {
+            val store = AppPreferencesStore(appContext)
+            store.setEqualizerBands(bands)
+            store.setEqualizerPreset(presetName)
+        }
+    }
+
+    private fun applyEqualizerToEffects() {
         val eq = equalizer ?: return
-        if (index !in 0 until eq.numberOfBands) return
-        val minLevel = eq.bandLevelRange[0]
-        val maxLevel = eq.bandLevelRange[1]
-        val level = (minLevel + (maxLevel - minLevel) * normalized.coerceIn(0f, 1f)).toInt().toShort()
-        eq.setBandLevel(index.toShort(), level)
-        val bands = _equalizerBands.value.toMutableList()
-        if (index < bands.size) {
-            bands[index] = normalized.coerceIn(0f, 1f)
-            _equalizerBands.value = bands
+        val enabled = _equalizerEnabled.value
+        try {
+            eq.enabled = enabled
+            if (!enabled) return
+
+            val numBands = eq.numberOfBands.toInt()
+            val minLevel = eq.bandLevelRange[0].toInt()
+            val maxLevel = eq.bandLevelRange[1].toInt()
+            val bands = _equalizerBands.value
+
+            if (numBands > 0) {
+                for (i in 0 until numBands) {
+                    val normalizedIdx = ((i.toFloat() / (numBands - 1).coerceAtLeast(1)) * (bands.size - 1)).toInt().coerceIn(0, bands.size - 1)
+                    val normalizedVal = bands[normalizedIdx]
+                    val level = (minLevel + (maxLevel - minLevel) * normalizedVal).toInt().toShort()
+                    eq.setBandLevel(i.toShort(), level)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to apply Equalizer effects", e)
         }
     }
 
@@ -1945,8 +2099,6 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     private fun attachAudioEffects(sessionId: Int) {
-        if (sessionId == 0) return
-        // Re-binding Visualizer/EQ on every READY can glitch or stop audio on some OEMs
         if (sessionId == attachedAudioSessionId && (visualizer != null || equalizer != null)) {
             return
         }
@@ -1958,7 +2110,7 @@ class PlayerEngine private constructor(private val appContext: Context) {
             android.Manifest.permission.RECORD_AUDIO
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-        if (hasRecordAudio) {
+        if (hasRecordAudio && sessionId != 0) {
             try {
                 visualizer = Visualizer(sessionId).apply {
                     captureSize = Visualizer.getCaptureSizeRange()[1]
@@ -2008,35 +2160,36 @@ class PlayerEngine private constructor(private val appContext: Context) {
         }
 
         try {
-            equalizer = Equalizer(0, sessionId).apply {
+            val effSessionId = if (sessionId != 0) sessionId else 0
+            equalizer = Equalizer(0, effSessionId).apply {
                 enabled = _equalizerEnabled.value
-                val bands = numberOfBands.toInt()
-                val minLevel = bandLevelRange[0].toInt()
-                val maxLevel = bandLevelRange[1].toInt()
-                val span = (maxLevel - minLevel).coerceAtLeast(1)
-                _equalizerBands.value = List(bands) { i ->
-                    (getBandLevel(i.toShort()) - minLevel).toFloat() / span
-                }
             }
+            bassBoost = BassBoost(0, effSessionId).apply {
+                val strength = (_bassBoostStrength.value * 1000).toInt().toShort()
+                setStrength(strength)
+                enabled = _equalizerEnabled.value && strength > 0
+            }
+            virtualizer = Virtualizer(0, effSessionId).apply {
+                val strength = (_virtualizerStrength.value * 1000).toInt().toShort()
+                setStrength(strength)
+                enabled = _equalizerEnabled.value && strength > 0
+            }
+            applyEqualizerToEffects()
         } catch (e: Exception) {
-            Log.w(tag, "Equalizer unavailable", e)
-            _equalizerBands.value = emptyList()
+            Log.w(tag, "Audio effects unavailable for session $sessionId", e)
         }
     }
 
     private fun releaseAudioEffects() {
         attachedAudioSessionId = 0
-        try {
-            visualizer?.enabled = false
-            visualizer?.release()
-        } catch (_: Exception) {
-        }
+        try { visualizer?.enabled = false; visualizer?.release() } catch (_: Exception) {}
         visualizer = null
-        try {
-            equalizer?.release()
-        } catch (_: Exception) {
-        }
+        try { equalizer?.release() } catch (_: Exception) {}
         equalizer = null
+        try { bassBoost?.release() } catch (_: Exception) {}
+        bassBoost = null
+        try { virtualizer?.release() } catch (_: Exception) {}
+        virtualizer = null
     }
 
     private fun stopEngine(keepSession: Boolean = false) {
@@ -2399,6 +2552,17 @@ class PlayerEngine private constructor(private val appContext: Context) {
     }
 
     companion object {
+        val PRESETS = mapOf(
+            "Flat" to listOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f),
+            "Rock" to listOf(0.7f, 0.6f, 0.4f, 0.6f, 0.8f),
+            "Pop" to listOf(0.4f, 0.6f, 0.7f, 0.5f, 0.4f),
+            "Jazz" to listOf(0.6f, 0.5f, 0.4f, 0.6f, 0.7f),
+            "Classical" to listOf(0.7f, 0.6f, 0.5f, 0.6f, 0.7f),
+            "Electronic" to listOf(0.8f, 0.7f, 0.4f, 0.6f, 0.9f),
+            "Vocal" to listOf(0.3f, 0.4f, 0.8f, 0.7f, 0.4f),
+            "Acoustic" to listOf(0.6f, 0.5f, 0.6f, 0.7f, 0.6f)
+        )
+
         @Volatile
         private var INSTANCE: PlayerEngine? = null
 

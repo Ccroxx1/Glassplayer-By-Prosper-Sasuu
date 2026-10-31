@@ -151,6 +151,10 @@ class AudioViewModel(
     val volume = engine.volume
     val equalizerBands = engine.equalizerBands
     val equalizerEnabled = engine.equalizerEnabled
+    val bassBoostStrength = engine.bassBoostStrength
+    val virtualizerStrength = engine.virtualizerStrength
+    val equalizerPreset = engine.equalizerPreset
+    val visualizerStyle = engine.visualizerStyle
     val sleepTimerRemainingMs = engine.sleepTimerRemainingMs
 
     val crossfadeSec: StateFlow<Float> = appPreferencesStore.crossfadeSec
@@ -420,6 +424,10 @@ class AudioViewModel(
     fun syncSystemVolume() = engine.syncSystemVolume()
     fun setEqualizerEnabled(enabled: Boolean) = engine.setEqualizerEnabled(enabled)
     fun setEqualizerBand(index: Int, normalized: Float) = engine.setEqualizerBand(index, normalized)
+    fun setBassBoostStrength(strength: Float) = engine.setBassBoostStrength(strength)
+    fun setVirtualizerStrength(strength: Float) = engine.setVirtualizerStrength(strength)
+    fun applyEqualizerPreset(presetName: String) = engine.applyEqualizerPreset(presetName)
+    fun setVisualizerStyle(style: VisualizerStyle) = engine.setVisualizerStyle(style)
     fun setSleepTimer(durationMs: Long) = engine.setSleepTimer(durationMs)
     fun cancelSleepTimer() = engine.cancelSleepTimer()
 

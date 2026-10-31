@@ -19,8 +19,8 @@ android {
         applicationId = "com.aistudio.glassaudioplayer.vwbxta"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
-        versionName = "v2.0"
+        versionCode = 6
+        versionName = "v2.0.1"
 
       val localProperties = Properties()
       val localPropertiesFile = project.rootProject.file("local.properties")

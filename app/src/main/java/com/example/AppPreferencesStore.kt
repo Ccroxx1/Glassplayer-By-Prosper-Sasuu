@@ -29,6 +29,16 @@ class AppPreferencesStore(private val context: Context) {
         private val KEY_FIRST_LAUNCH = booleanPreferencesKey("is_first_launch")
         private val KEY_LASTFM_USERNAME = stringPreferencesKey("lastfm_username")
         private val KEY_LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
+        private val KEY_EQ_ENABLED = booleanPreferencesKey("eq_enabled")
+        private val KEY_EQ_BAND_0 = floatPreferencesKey("eq_band_0")
+        private val KEY_EQ_BAND_1 = floatPreferencesKey("eq_band_1")
+        private val KEY_EQ_BAND_2 = floatPreferencesKey("eq_band_2")
+        private val KEY_EQ_BAND_3 = floatPreferencesKey("eq_band_3")
+        private val KEY_EQ_BAND_4 = floatPreferencesKey("eq_band_4")
+        private val KEY_EQ_BASS_BOOST = floatPreferencesKey("eq_bass_boost")
+        private val KEY_EQ_VIRTUALIZER = floatPreferencesKey("eq_virtualizer")
+        private val KEY_EQ_PRESET = stringPreferencesKey("eq_preset")
+        private val KEY_VISUALIZER_STYLE = stringPreferencesKey("visualizer_style")
     }
 
     // ── Crossfade ────────────────────────────────────────────────────────────
@@ -107,5 +117,61 @@ class AppPreferencesStore(private val context: Context) {
             it.remove(KEY_LASTFM_USERNAME)
             it.remove(KEY_LASTFM_SESSION_KEY)
         }
+    }
+
+    // ── Equalizer ────────────────────────────────────────────────────────────
+    val equalizerEnabled: Flow<Boolean> = context.appPrefsDataStore.data.map {
+        it[KEY_EQ_ENABLED] ?: true
+    }
+    suspend fun setEqualizerEnabled(enabled: Boolean) {
+        context.appPrefsDataStore.edit { it[KEY_EQ_ENABLED] = enabled }
+    }
+
+    val equalizerBands: Flow<List<Float>> = context.appPrefsDataStore.data.map {
+        val b0 = it[KEY_EQ_BAND_0] ?: 0.5f
+        val b1 = it[KEY_EQ_BAND_1] ?: 0.5f
+        val b2 = it[KEY_EQ_BAND_2] ?: 0.5f
+        val b3 = it[KEY_EQ_BAND_3] ?: 0.5f
+        val b4 = it[KEY_EQ_BAND_4] ?: 0.5f
+        listOf(b0, b1, b2, b3, b4)
+    }
+    suspend fun setEqualizerBands(bands: List<Float>) {
+        if (bands.size != 5) return
+        context.appPrefsDataStore.edit {
+            it[KEY_EQ_BAND_0] = bands[0]
+            it[KEY_EQ_BAND_1] = bands[1]
+            it[KEY_EQ_BAND_2] = bands[2]
+            it[KEY_EQ_BAND_3] = bands[3]
+            it[KEY_EQ_BAND_4] = bands[4]
+        }
+    }
+
+    val bassBoostStrength: Flow<Float> = context.appPrefsDataStore.data.map {
+        it[KEY_EQ_BASS_BOOST] ?: 0f
+    }
+    suspend fun setBassBoostStrength(str: Float) {
+        context.appPrefsDataStore.edit { it[KEY_EQ_BASS_BOOST] = str }
+    }
+
+    val virtualizerStrength: Flow<Float> = context.appPrefsDataStore.data.map {
+        it[KEY_EQ_VIRTUALIZER] ?: 0f
+    }
+    suspend fun setVirtualizerStrength(str: Float) {
+        context.appPrefsDataStore.edit { it[KEY_EQ_VIRTUALIZER] = str }
+    }
+
+    val equalizerPreset: Flow<String> = context.appPrefsDataStore.data.map {
+        it[KEY_EQ_PRESET] ?: "Flat"
+    }
+    suspend fun setEqualizerPreset(preset: String) {
+        context.appPrefsDataStore.edit { it[KEY_EQ_PRESET] = preset }
+    }
+
+    val visualizerStyle: Flow<VisualizerStyle> = context.appPrefsDataStore.data.map {
+        val name = it[KEY_VISUALIZER_STYLE] ?: VisualizerStyle.BARS.name
+        try { VisualizerStyle.valueOf(name) } catch (_: Exception) { VisualizerStyle.BARS }
+    }
+    suspend fun setVisualizerStyle(style: VisualizerStyle) {
+        context.appPrefsDataStore.edit { it[KEY_VISUALIZER_STYLE] = style.name }
     }
 }

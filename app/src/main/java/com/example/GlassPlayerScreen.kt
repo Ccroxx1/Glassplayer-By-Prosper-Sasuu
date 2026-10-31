@@ -3567,6 +3567,9 @@ fun MainPlayerView(viewModel: AudioViewModel) {
     val volume by viewModel.volume.collectAsState()
     val equalizerBands by viewModel.equalizerBands.collectAsState()
     val equalizerEnabled by viewModel.equalizerEnabled.collectAsState()
+    val bassBoostStrength by viewModel.bassBoostStrength.collectAsState()
+    val virtualizerStrength by viewModel.virtualizerStrength.collectAsState()
+    val equalizerPreset by viewModel.equalizerPreset.collectAsState()
     val sleepRemaining by viewModel.sleepTimerRemainingMs.collectAsState()
     val isFetchingLyrics by viewModel.isFetchingLyrics.collectAsState()
     val playbackPosition by viewModel.playbackPosition.collectAsState()
@@ -3874,35 +3877,23 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                         .testTag("loop_button")
                         .testTag("playback_mode_button")
                 ) {
-                    when (playbackMode) {
-                        PlaybackMode.NORMAL -> Icon(
-                            imageVector = Icons.Rounded.Repeat,
-                            contentDescription = "Normal playback",
-                            tint = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        PlaybackMode.SHUFFLE -> Icon(
-                            imageVector = Icons.Rounded.Shuffle,
-                            contentDescription = "Shuffle playback",
-                            tint = GlassCyan,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        PlaybackMode.REPEAT_ALL -> Icon(
-                            imageVector = Icons.Rounded.Repeat,
-                            contentDescription = "Repeat All",
-                            tint = GlassCyan,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        PlaybackMode.REPEAT_ONE -> Icon(
+                    when (repeatMode) {
+                        RepeatMode.ONE -> Icon(
                             imageVector = Icons.Rounded.RepeatOne,
                             contentDescription = "Repeat One",
                             tint = GlassCyan,
                             modifier = Modifier.size(22.dp)
                         )
-                        PlaybackMode.SHUFFLE_REPEAT_ALL -> Icon(
+                        RepeatMode.ALL -> Icon(
                             imageVector = Icons.Rounded.Repeat,
-                            contentDescription = "Shuffle Repeat All",
+                            contentDescription = "Repeat All",
                             tint = GlassCyan,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        RepeatMode.OFF -> Icon(
+                            imageVector = Icons.Rounded.Repeat,
+                            contentDescription = "Repeat Off",
+                            tint = Color.White.copy(alpha = 0.5f),
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -4047,7 +4038,7 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Equalizer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Multi-Band Equalizer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         Switch(
                             checked = equalizerEnabled,
                             onCheckedChange = { viewModel.setEqualizerEnabled(it) },
@@ -4057,34 +4048,91 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                             )
                         )
                     }
-                    if (equalizerBands.isEmpty()) {
-                        Text(
-                            "EQ available while a local track is playing",
-                            color = Color.White.copy(alpha = 0.5f),
-                            fontSize = 11.sp
-                        )
-                    } else {
-                        equalizerBands.forEachIndexed { index, value ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "B${index + 1}",
-                                    color = Color.White.copy(alpha = 0.6f),
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.width(28.dp),
-                                    fontFamily = FontFamily.Monospace
+
+                    val presets = listOf("Flat", "Rock", "Pop", "Jazz", "Classical", "Electronic", "Vocal", "Acoustic")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        presets.forEach { preset ->
+                            val isSelected = equalizerPreset == preset
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.applyEqualizerPreset(preset) },
+                                label = { Text(preset, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GlassCyan.copy(alpha = 0.3f),
+                                    selectedLabelColor = Color.White,
+                                    containerColor = Color.White.copy(alpha = 0.05f),
+                                    labelColor = Color.White.copy(alpha = 0.7f)
                                 )
-                                Slider(
-                                    value = value,
-                                    onValueChange = { viewModel.setEqualizerBand(index, it) },
-                                    enabled = equalizerEnabled,
-                                    modifier = Modifier.weight(1f),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = GlassPurple,
-                                        activeTrackColor = GlassPurple,
-                                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
-                                    )
+                            )
+                        }
+                    }
+
+                    val frequencies = listOf("60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "14 kHz")
+                    equalizerBands.forEachIndexed { index, value ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                frequencies.getOrElse(index) { "B${index + 1}" },
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 10.sp,
+                                modifier = Modifier.width(44.dp),
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Slider(
+                                value = value,
+                                onValueChange = { viewModel.setEqualizerBand(index, it) },
+                                enabled = equalizerEnabled,
+                                modifier = Modifier.weight(1f),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = GlassPurple,
+                                    activeTrackColor = GlassPurple,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.1f)
                                 )
-                            }
+                            )
+                            Text(
+                                text = "${((value - 0.5f) * 30).toInt()} dB",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 10.sp,
+                                modifier = Modifier.width(38.dp),
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Bass Boost", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                            Slider(
+                                value = bassBoostStrength,
+                                onValueChange = { viewModel.setBassBoostStrength(it) },
+                                enabled = equalizerEnabled,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = GlassCyan,
+                                    activeTrackColor = GlassCyan,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                                )
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("3D Surround", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                            Slider(
+                                value = virtualizerStrength,
+                                onValueChange = { viewModel.setVirtualizerStrength(it) },
+                                enabled = equalizerEnabled,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = GlassMagenta,
+                                    activeTrackColor = GlassMagenta,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                                )
+                            )
                         }
                     }
 
@@ -4224,6 +4272,28 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                     }
 
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(0f to "Off (0s)", 3f to "Fade (3s)", 5f to "Smooth (5s)", 8f to "Long (8s)").forEach { (sec, label) ->
+                            val isSelected = kotlin.math.abs(crossfadeSec - sec) < 0.5f
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.setCrossfade(sec) },
+                                label = { Text(label, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GlassCyan.copy(alpha = 0.3f),
+                                    selectedLabelColor = Color.White,
+                                    containerColor = Color.White.copy(alpha = 0.05f),
+                                    labelColor = Color.White.copy(alpha = 0.7f)
+                                )
+                            )
+                        }
+                    }
+
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -4270,11 +4340,16 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                             Text("Cancel timer", color = GlassMagenta)
                         }
                     } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(5L to "5m", 15L to "15m", 30L to "30m", 60L to "60m").forEach { (mins, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(10L to "10m", 15L to "15m", 30L to "30m", 45L to "45m", 60L to "60m", 90L to "90m").forEach { (mins, label) ->
                                 AssistChip(
                                     onClick = { viewModel.setSleepTimer(mins * 60_000L) },
-                                    label = { Text(label) },
+                                    label = { Text(label, fontSize = 11.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = GlassCyan.copy(alpha = 0.15f),
                                         labelColor = Color.White
@@ -4357,21 +4432,49 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                 }
             }
 
+            var immersiveLyrics by remember { mutableStateOf(false) }
+            var lyricFontSize by remember { mutableStateOf(15.sp) }
+
             AnimatedVisibility(visible = showLyrics) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassCard(borderColor = GlassMagenta.copy(alpha = 0.35f))
+                        .glassCard(borderColor = GlassMagenta.copy(alpha = 0.45f))
                         .padding(12.dp)
                 ) {
-                    // Header with fetch button
+                    // Header with fetch button & immersive toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Lyrics", color = GlassMagenta, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Karaoke Lyrics", color = GlassMagenta, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            IconButton(
+                                onClick = {
+                                    lyricFontSize = when (lyricFontSize) {
+                                        15.sp -> 18.sp
+                                        18.sp -> 22.sp
+                                        else -> 15.sp
+                                    }
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Text("A±", fontSize = 10.sp, color = GlassCyan, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { immersiveLyrics = !immersiveLyrics },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (immersiveLyrics) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
+                                    contentDescription = "Immersive Mode",
+                                    tint = GlassCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             if (isFetchingLyrics) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
@@ -4418,22 +4521,29 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                             state = lrcListState,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 160.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                .heightIn(max = if (immersiveLyrics) 320.dp else 160.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(lrcLines.size) { idx ->
                                 val line = lrcLines[idx]
                                 val isActive = idx == activeIdx
-                                Text(
-                                    text = line.text,
-                                    color = if (isActive) GlassCyan else Color.White.copy(alpha = if (idx < activeIdx) 0.4f else 0.65f),
-                                    fontSize = if (isActive) 16.sp else 13.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 2.dp)
-                                )
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isActive) GlassCyan.copy(alpha = 0.15f) else Color.Transparent)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = line.text,
+                                        color = if (isActive) GlassCyan else Color.White.copy(alpha = if (idx < activeIdx) 0.35f else 0.65f),
+                                        fontSize = if (isActive) (lyricFontSize.value + 2).sp else lyricFontSize,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -5165,26 +5275,77 @@ fun InteractiveQueueView(
 private fun NowPlayingWaveform(viewModel: AudioViewModel) {
     val visualizerBars by viewModel.waveformAmplitudes.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    Row(
+    val visualizerStyle by viewModel.visualizerStyle.collectAsState()
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(60.dp)
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.Bottom
+            .padding(horizontal = 16.dp)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                val nextStyle = when (visualizerStyle) {
+                    VisualizerStyle.BARS -> VisualizerStyle.WAVE
+                    VisualizerStyle.WAVE -> VisualizerStyle.RADIAL
+                    VisualizerStyle.RADIAL -> VisualizerStyle.NEON
+                    VisualizerStyle.NEON -> VisualizerStyle.BARS
+                }
+                viewModel.setVisualizerStyle(nextStyle)
+            }
     ) {
-        visualizerBars.forEach { amplitude ->
-            val barFraction = if (isPlaying) amplitude.coerceIn(0.08f, 1f) else 0.08f
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(barFraction)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = if (isPlaying) listOf(GlassCyan, GlassPurple) else listOf(Color.White.copy(alpha = 0.25f), Color.White.copy(alpha = 0.12f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            horizontalArrangement = Arrangement.spacedBy(
+                when (visualizerStyle) {
+                    VisualizerStyle.WAVE -> 2.dp
+                    VisualizerStyle.RADIAL -> 3.dp
+                    else -> 4.dp
+                }
+            ),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            val count = visualizerBars.size
+            visualizerBars.forEachIndexed { index, amplitude ->
+                val barFraction = if (isPlaying) amplitude.coerceIn(0.08f, 1f) else 0.08f
+                val colors = when (visualizerStyle) {
+                    VisualizerStyle.WAVE -> if (isPlaying) listOf(GlassMagenta, GlassCyan) else listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.1f))
+                    VisualizerStyle.RADIAL -> {
+                        if (isPlaying) listOf(GlassPurple, GlassCyan) else listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.1f))
+                    }
+                    VisualizerStyle.NEON -> if (isPlaying) listOf(GlassCyan, GlassMagenta, GlassPurple) else listOf(Color.White.copy(alpha = 0.25f), Color.White.copy(alpha = 0.12f))
+                    else -> if (isPlaying) listOf(GlassCyan, GlassPurple) else listOf(Color.White.copy(alpha = 0.25f), Color.White.copy(alpha = 0.12f))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(
+                            when (visualizerStyle) {
+                                VisualizerStyle.RADIAL -> {
+                                    val centerDist = kotlin.math.abs(index - count / 2f) / (count / 2f)
+                                    (barFraction * (1f - centerDist * 0.4f)).coerceIn(0.08f, 1f)
+                                }
+                                else -> barFraction
+                            }
                         )
-                    )
+                        .clip(RoundedCornerShape(if (visualizerStyle == VisualizerStyle.NEON) 6.dp else 3.dp))
+                        .background(Brush.verticalGradient(colors = colors))
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Style: ${visualizerStyle.name} (Tap to change)",
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                fontFamily = FontFamily.Monospace
             )
         }
     }
@@ -5197,6 +5358,7 @@ private fun NowPlayingSeekBar(
     modifier: Modifier = Modifier
 ) {
     val progress by viewModel.playbackProgress.collectAsState()
+    val waveformBars by viewModel.waveformAmplitudes.collectAsState()
     val currentPosition = progress.position
     val effectiveDuration = if (progress.duration > 0 && progress.duration != C.TIME_UNSET) {
         progress.duration
@@ -5209,28 +5371,61 @@ private fun NowPlayingSeekBar(
         val currentSliderValue = sliderValueOverride
             ?: (if (effectiveDuration > 0) currentPosition.toFloat() / effectiveDuration else 0f)
 
-        Slider(
-            value = currentSliderValue.coerceIn(0f, 1f),
-            onValueChange = { factor ->
-                sliderValueOverride = factor
-            },
-            onValueChangeFinished = {
-                sliderValueOverride?.let { factor ->
-                    if (effectiveDuration > 0) {
-                        viewModel.seekTo((factor * effectiveDuration).toLong())
-                    }
-                }
-                sliderValueOverride = null
-            },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("track_progress_slider"),
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = GlassCyan,
-                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                .height(32.dp)
+                .padding(horizontal = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val totalBars = waveformBars.size
+                waveformBars.forEachIndexed { index, amp ->
+                    val heightFraction = amp.coerceIn(0.15f, 1f)
+                    val barProgress = index.toFloat() / totalBars.coerceAtLeast(1)
+                    val isPassed = barProgress <= currentSliderValue
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(heightFraction)
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(
+                                if (isPassed) GlassCyan else Color.White.copy(alpha = 0.3f)
+                            )
+                    )
+                }
+            }
+
+            Slider(
+                value = currentSliderValue.coerceIn(0f, 1f),
+                onValueChange = { factor ->
+                    sliderValueOverride = factor
+                },
+                onValueChangeFinished = {
+                    sliderValueOverride?.let { factor ->
+                        if (effectiveDuration > 0) {
+                            viewModel.seekTo((factor * effectiveDuration).toLong())
+                        }
+                    }
+                    sliderValueOverride = null
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("track_progress_slider"),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent
+                )
             )
-        )
+        }
 
         Row(
             modifier = Modifier
@@ -5689,7 +5884,7 @@ fun AboutDialog(onDismiss: () -> Unit, strings: LanguageStrings) {
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("GlassPlayer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                    Text("${strings.version} 2.0", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("${strings.version} 2.0.1", color = GlassCyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
 
                 Text(
