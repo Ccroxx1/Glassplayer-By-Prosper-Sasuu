@@ -1,4 +1,4 @@
-# 🎵 GlassPlayer v2.0.1
+# 🎵 GlassPlayer 2.0.1
 
 ### A modern, glassmorphism-inspired Android music player built with Jetpack Compose.
 
