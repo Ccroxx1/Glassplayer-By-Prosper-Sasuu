@@ -10,10 +10,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.net.Uri
 import android.os.Build
 import android.widget.RemoteViews
-import androidx.core.graphics.scale
-import androidx.core.net.toUri
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -88,8 +87,11 @@ class GlassPlayerWidget : AppWidgetProvider() {
 
         private fun pendingBroadcast(context: Context, action: String, req: Int): PendingIntent {
             val intent = Intent(context, GlassPlayerWidget::class.java).apply { this.action = action }
-            val flags =
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
             return PendingIntent.getBroadcast(context, req, intent, flags)
         }
 
@@ -110,7 +112,7 @@ class GlassPlayerWidget : AppWidgetProvider() {
             // Album art
             val artBitmap = track?.albumArtUri?.let { uriStr ->
                 try {
-                    context.contentResolver.openInputStream(uriStr.toUri())?.use { stream ->
+                    context.contentResolver.openInputStream(Uri.parse(uriStr))?.use { stream ->
                         val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
                         BitmapFactory.decodeStream(stream, null, opts)
                     }
@@ -143,8 +145,11 @@ class GlassPlayerWidget : AppWidgetProvider() {
             // Tap on art/title opens the app
             val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             if (launchIntent != null) {
-                val flags =
+                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
                 val launchPending = PendingIntent.getActivity(context, 0, launchIntent, flags)
                 views.setOnClickPendingIntent(R.id.widget_art, launchPending)
                 views.setOnClickPendingIntent(R.id.widget_title, launchPending)
@@ -165,8 +170,8 @@ class GlassPlayerWidget : AppWidgetProvider() {
         private fun blurBitmap(src: Bitmap): Bitmap {
             val scaledW = (src.width / 8).coerceAtLeast(1)
             val scaledH = (src.height / 8).coerceAtLeast(1)
-            val small = src.scale(scaledW, scaledH)
-            val blurred = small.scale(src.width, src.height)
+            val small = Bitmap.createScaledBitmap(src, scaledW, scaledH, true)
+            val blurred = Bitmap.createScaledBitmap(small, src.width, src.height, true)
             val out = blurred.copy(Bitmap.Config.ARGB_8888, true)
             val canvas = Canvas(out)
             val overlay = Paint().apply {
