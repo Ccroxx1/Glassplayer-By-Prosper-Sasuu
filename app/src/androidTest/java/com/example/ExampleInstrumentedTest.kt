@@ -11,6 +11,6 @@ class ExampleInstrumentedTest {
   @Test
   fun useAppContext() {
     val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-    assertEquals("com.aistudio.glassaudioplayer.vwbxta", appContext.packageName)
+    assertEquals("com.prospersasuu.glassplayer", appContext.packageName)
   }
 }
