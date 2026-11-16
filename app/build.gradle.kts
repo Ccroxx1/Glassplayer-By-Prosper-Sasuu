@@ -1,0 +1,119 @@
+import java.util.Properties
+
+plugins {
+  alias(libs.plugins.android.application)
+  alias(libs.plugins.kotlin.compose)
+  alias(libs.plugins.google.devtools.ksp)
+  alias(libs.plugins.roborazzi)
+}
+
+android {
+  namespace = "com.example"
+  compileSdk = 36
+
+  fun quoteForBuildConfig(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+  }
+
+    defaultConfig {
+        applicationId = "com.prospersasuu.glassplayer"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 6
+        versionName = "2.0.1"
+
+      val localProperties = Properties()
+      val localPropertiesFile = project.rootProject.file("local.properties")
+      if (localPropertiesFile.exists()) {
+        localProperties.load(localPropertiesFile.inputStream())
+      }
+
+      val lastFmApiKey =
+        (project.findProperty("LASTFM_API_KEY") as String?)
+          ?: localProperties.getProperty("LASTFM_API_KEY")
+          ?: System.getenv("LASTFM_API_KEY")
+          ?: ""
+      val lastFmApiSecret =
+        (project.findProperty("LASTFM_API_SECRET") as String?)
+          ?: localProperties.getProperty("LASTFM_API_SECRET")
+          ?: System.getenv("LASTFM_API_SECRET")
+          ?: ""
+      buildConfigField("String", "LASTFM_API_KEY", quoteForBuildConfig(lastFmApiKey))
+      buildConfigField("String", "LASTFM_API_SECRET", quoteForBuildConfig(lastFmApiSecret))
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+  signingConfigs {
+    create("release") {
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      storeFile = file(keystorePath)
+      storePassword = System.getenv("STORE_PASSWORD")
+      keyAlias = "upload"
+      keyPassword = System.getenv("KEY_PASSWORD")
+    }
+  }
+
+  buildTypes {
+    release {
+      isCrunchPngs = false
+      isMinifyEnabled = false
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      // Use debug signing so a local APK can be built without a release keystore
+      signingConfig = signingConfigs.getByName("debug")
+    }
+    debug { }
+  }
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+  }
+  buildFeatures {
+    compose = true
+    buildConfig = true
+  }
+  testOptions { unitTests { isIncludeAndroidResources = true } }
+}
+
+dependencies {
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.compose.material.icons.core)
+  implementation(libs.androidx.compose.material.icons.extended)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.ui.graphics)
+  implementation(libs.androidx.compose.ui.tooling.preview)
+  implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.runtime.ktx)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.media)
+  implementation(libs.androidx.media3.exoplayer)
+  implementation(libs.androidx.media3.session)
+  implementation(libs.androidx.media3.common)
+  implementation(libs.androidx.palette)
+  implementation(libs.androidx.datastore.preferences)
+  implementation(libs.androidx.room.ktx)
+  implementation(libs.androidx.room.runtime)
+  implementation(libs.coil.compose)
+  implementation(libs.kotlinx.coroutines.android)
+  implementation(libs.kotlinx.coroutines.core)
+  testImplementation(libs.androidx.compose.ui.test.junit4)
+  testImplementation(libs.androidx.core)
+  testImplementation(libs.androidx.junit)
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.robolectric)
+  testImplementation(libs.roborazzi)
+  testImplementation(libs.roborazzi.compose)
+  testImplementation(libs.roborazzi.junit.rule)
+  androidTestImplementation(platform(libs.androidx.compose.bom))
+  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+  androidTestImplementation(libs.androidx.espresso.core)
+  androidTestImplementation(libs.androidx.junit)
+  androidTestImplementation(libs.androidx.runner)
+  debugImplementation(libs.androidx.compose.ui.test.manifest)
+  debugImplementation(libs.androidx.compose.ui.tooling)
+  "ksp"(libs.androidx.room.compiler)
+}

@@ -1,0 +1,6 @@
+{
+  "name": "GlassPlayer By Prosper Sasuu",
+  "description": "Glassmorphic local music player with Media3 ExoPlayer, dynamic album-art theming, smart playlists, folder blacklisting, and vinyl gesture controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
