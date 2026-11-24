@@ -1548,13 +1548,43 @@ class AudioViewModel(
                 if (name == "External Track") {
                     name = uri.lastPathSegment ?: "External Track"
                 }
-                val title = name.substringBeforeLast('.')
+                var title = name.substringBeforeLast('.')
+                var artist = "Unknown Artist"
+                var album = "External Files"
+                var durationMs = 0L
+                var artUri: String? = null
+
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(context, uri)
+                    val extractedTitle = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    val extractedArtist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    val extractedAlbum = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                    val extractedDuration = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+
+                    if (!extractedTitle.isNullOrBlank()) title = extractedTitle
+                    if (!extractedArtist.isNullOrBlank()) artist = extractedArtist
+                    if (!extractedAlbum.isNullOrBlank()) album = extractedAlbum
+                    if (!extractedDuration.isNullOrBlank()) durationMs = extractedDuration.toLongOrNull() ?: 0L
+
+                    val artBytes = retriever.embeddedPicture
+                    if (artBytes != null) {
+                        val artFile = java.io.File(context.cacheDir, "ext_art_${System.currentTimeMillis()}.jpg")
+                        artFile.writeBytes(artBytes)
+                        artUri = artFile.absolutePath
+                    }
+                    retriever.release()
+                } catch (e: Exception) {
+                    Log.e("AudioViewModel", "Failed to extract metadata for external file", e)
+                }
+
                 val track = AudioTrackEntity(
                     uri = uriString,
-                    title = title.ifBlank { "External Track" },
-                    artist = "Unknown Artist",
-                    album = "External Files",
-                    durationMs = 0L
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    durationMs = durationMs,
+                    albumArtUri = artUri
                 )
                 playTrack(track)
             }
