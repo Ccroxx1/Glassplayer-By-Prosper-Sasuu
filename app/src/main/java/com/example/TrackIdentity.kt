@@ -116,3 +116,12 @@ fun AudioTrackEntity.normalizedForPersistence(): AudioTrackEntity? {
         dateAdded = if (dateAdded > 0L) dateAdded else System.currentTimeMillis()
     )
 }
+
+fun AudioTrackEntity.resolvedAlbumArtUri(): String? {
+    if (!albumArtUri.isNullOrBlank()) return albumArtUri
+    val ytId = youtubeVideoId()
+    if (ytId != null) {
+        return "https://i.ytimg.com/vi/$ytId/hqdefault.jpg"
+    }
+    return null
+}

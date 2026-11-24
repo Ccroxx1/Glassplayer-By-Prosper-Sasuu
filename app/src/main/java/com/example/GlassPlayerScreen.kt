@@ -766,10 +766,10 @@ fun GlassHeader(
                             modifier = Modifier.size(28.dp)
                         )
                     }
-                } else if (!currentTrack.albumArtUri.isNullOrBlank()) {
+                } else {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
-                            .data(currentTrack.albumArtUri)
+                            .data(currentTrack.resolvedAlbumArtUri() ?: R.drawable.img_app_icon_1784343634612)
                             .transformations(CleanArtworkTransformation())
                             .crossfade(true)
                             .allowHardware(true)
@@ -780,28 +780,6 @@ fun GlassHeader(
                         error = painterResource(id = R.drawable.img_app_icon_1784343634612),
                         placeholder = painterResource(id = R.drawable.img_app_icon_1784343634612)
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        GlassCyan.copy(alpha = 0.35f),
-                                        Color(0xFF11122B),
-                                        GlassMagenta.copy(alpha = 0.3f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.AudioFile,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
                 }
 
                 // Soft glass scrim so brand + tabs stay readable
