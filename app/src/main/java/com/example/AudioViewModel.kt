@@ -1504,6 +1504,63 @@ class AudioViewModel(
         }
     }
 
+    fun handleIncomingIntent(intent: android.content.Intent?, context: Context) {
+        val uri = intent?.data ?: (intent?.getParcelableExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)) ?: return
+        val action = intent?.action
+        val type = intent?.type
+
+        if (action == android.content.Intent.ACTION_VIEW || action == android.content.Intent.ACTION_SEND) {
+            val uriString = uri.toString()
+            if (uriString.endsWith(".json", true) || type == "application/json") {
+                try {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                        val json = reader.readText()
+                        importBackup(json) { result ->
+                            Log.d("AudioViewModel", "Imported backup from intent: ${result.playlistsRestored} playlists")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AudioViewModel", "Failed to import backup from intent", e)
+                }
+            } else if (uriString.endsWith(".m3u", true) || uriString.endsWith(".m3u8", true) || type?.contains("m3u") == true) {
+                try {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                        val text = reader.readText()
+                        importM3u(text) { summary ->
+                            Log.d("AudioViewModel", "Imported M3U from intent: ${summary.playlistName}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AudioViewModel", "Failed to import M3U from intent", e)
+                }
+            } else {
+                var name = "External Track"
+                try {
+                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (nameIndex != -1) {
+                                name = cursor.getString(nameIndex) ?: name
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+                if (name == "External Track") {
+                    name = uri.lastPathSegment ?: "External Track"
+                }
+                val title = name.substringBeforeLast('.')
+                val track = AudioTrackEntity(
+                    uri = uriString,
+                    title = title.ifBlank { "External Track" },
+                    artist = "Unknown Artist",
+                    album = "External Files",
+                    durationMs = 0L
+                )
+                playTrack(track)
+            }
+        }
+    }
+
     override fun onCleared() {
         stopWatchingLibrary()
         engine.onSessionChanged = null

@@ -25,6 +25,13 @@ class MainActivity : ComponentActivity() {
                 GlassPlayerApp(viewModel = viewModel)
             }
         }
+        viewModel.handleIncomingIntent(intent, applicationContext)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        viewModel.handleIncomingIntent(intent, applicationContext)
     }
 
     override fun onStart() {
