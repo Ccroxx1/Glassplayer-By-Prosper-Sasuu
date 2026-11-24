@@ -36,7 +36,19 @@ data class LanguageStrings(
     val addFolder: String,
     val rescanAll: String,
     val done: String,
-    val onlineMusic: String
+    val onlineMusic: String,
+    val exportPlaylist: String,
+    val importPlaylist: String,
+    val exportAllPlaylists: String,
+    val backupPlaylists: String,
+    val restorePlaylists: String,
+    val playlistOnlyOption: String,
+    val playlistWithAudioOption: String,
+    val mergeOption: String,
+    val replaceOption: String,
+    val createNewOption: String,
+    val conflictDetected: String,
+    val unavailable: String
 )
 
 object Localization {
@@ -76,7 +88,19 @@ object Localization {
         addFolder = "Add Folder",
         rescanAll = "Rescan All Folders",
         done = "Done",
-        onlineMusic = "YouTube"
+        onlineMusic = "YouTube",
+        exportPlaylist = "Export Playlist",
+        importPlaylist = "Import Playlist",
+        exportAllPlaylists = "Export All Playlists",
+        backupPlaylists = "Backup Playlists",
+        restorePlaylists = "Restore Playlists",
+        playlistOnlyOption = "Playlist Only (.glassplaylist)",
+        playlistWithAudioOption = "Playlist + Music Files (.zip)",
+        mergeOption = "Merge",
+        replaceOption = "Replace",
+        createNewOption = "Create New",
+        conflictDetected = "Name conflict with existing playlist",
+        unavailable = "Unavailable"
     )
 
     private val Spanish = LanguageStrings(
@@ -115,7 +139,19 @@ object Localization {
         addFolder = "Añadir carpeta",
         rescanAll = "Escanear todo",
         done = "Hecho",
-        onlineMusic = "YouTube"
+        onlineMusic = "YouTube",
+        exportPlaylist = "Exportar lista",
+        importPlaylist = "Importar lista",
+        exportAllPlaylists = "Exportar todas las listas",
+        backupPlaylists = "Copia de seguridad",
+        restorePlaylists = "Restaurar listas",
+        playlistOnlyOption = "Solo lista (.glassplaylist)",
+        playlistWithAudioOption = "Lista + Archivos (.zip)",
+        mergeOption = "Combinar",
+        replaceOption = "Reemplazar",
+        createNewOption = "Crear nueva",
+        conflictDetected = "Conflicto con lista existente",
+        unavailable = "No disponible"
     )
 
     private val French = LanguageStrings(
@@ -154,7 +190,19 @@ object Localization {
         addFolder = "Ajouter un dossier",
         rescanAll = "Tout rescanner",
         done = "Terminé",
-        onlineMusic = "YouTube"
+        onlineMusic = "YouTube",
+        exportPlaylist = "Exporter la playlist",
+        importPlaylist = "Importer la playlist",
+        exportAllPlaylists = "Exporter toutes les playlists",
+        backupPlaylists = "Sauvegarder les playlists",
+        restorePlaylists = "Restaurer les playlists",
+        playlistOnlyOption = "Playlist uniquement (.glassplaylist)",
+        playlistWithAudioOption = "Playlist + Fichiers (.zip)",
+        mergeOption = "Fusionner",
+        replaceOption = "Remplacer",
+        createNewOption = "Créer une nouvelle",
+        conflictDetected = "Conflit avec une playlist existante",
+        unavailable = "Indisponible"
     )
 
     fun getStrings(language: String): LanguageStrings = when (language) {

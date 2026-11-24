@@ -527,11 +527,142 @@ class AudioRepository(
         )
     }
 
+    suspend fun getTracksInPlaylistSnapshot(playlistId: Int): List<AudioTrackEntity> {
+        return audioDao.getTracksInPlaylistSnapshot(playlistId)
+    }
+
+    suspend fun buildBackupPackage(
+        context: android.content.Context,
+        playlists: List<PlaylistEntity>,
+        exportType: String = "backup",
+        includeRelativePaths: Boolean = false
+    ): PlaylistBackupPackage {
+        val tracks = audioDao.getAllTracksSnapshot()
+        return BackupRestoreManager.buildBackupPackage(
+            context = context,
+            playlists = playlists,
+            getTracksInPlaylist = { id -> audioDao.getTracksInPlaylistSnapshot(id) },
+            allTracks = tracks,
+            exportType = exportType,
+            includeRelativeFilePaths = includeRelativePaths
+        )
+    }
+
+    suspend fun exportPackageJson(
+        context: android.content.Context,
+        playlists: List<PlaylistEntity>
+    ): String {
+        val pkg = buildBackupPackage(context, playlists, includeRelativePaths = false)
+        return BackupRestoreManager.serializePackage(pkg)
+    }
+
+    suspend fun exportPackageZip(
+        context: android.content.Context,
+        outputStream: java.io.OutputStream,
+        playlists: List<PlaylistEntity>,
+        onProgress: ((BackupProgress) -> Unit)? = null
+    ): Boolean {
+        val pkg = buildBackupPackage(context, playlists, includeRelativePaths = true)
+        return BackupRestoreManager.exportBackupZip(context, outputStream, pkg, onProgress)
+    }
+
+    suspend fun inspectBackupFromUri(
+        context: android.content.Context,
+        uri: android.net.Uri
+    ): Pair<PlaylistBackupPackage, Boolean> {
+        return BackupRestoreManager.inspectBackupFromUri(context, uri)
+    }
+
+    suspend fun buildImportPreview(
+        context: android.content.Context,
+        pkg: PlaylistBackupPackage,
+        isZip: Boolean,
+        sourceUri: android.net.Uri?
+    ): PlaylistImportPreview {
+        val existingPlaylists = audioDao.getAllPlaylistsSnapshot()
+        val libraryTracks = audioDao.getAllTracksSnapshot()
+        return BackupRestoreManager.buildImportPreview(
+            context = context,
+            backupPackage = pkg,
+            isZip = isZip,
+            sourceUri = sourceUri,
+            existingPlaylists = existingPlaylists,
+            allTracks = libraryTracks
+        )
+    }
+
+    suspend fun executeImport(
+        context: android.content.Context,
+        preview: PlaylistImportPreview,
+        onProgress: ((BackupProgress) -> Unit)? = null
+    ): PlaylistImportResult {
+        return BackupRestoreManager.executeImport(
+            context = context,
+            preview = preview,
+            audioDao = audioDao,
+            database = database,
+            onProgress = onProgress
+        )
+    }
+
+    suspend fun exportXspfString(): String {
+        val playlists = allPlaylistsSnapshot()
+        val tracks = audioDao.getAllTracksSnapshot()
+        return BackupRestoreManager.exportXspf(
+            playlists = playlists,
+            getTracksInPlaylist = { playlistId -> audioDao.getTracksInPlaylistSnapshot(playlistId) },
+            allTracks = tracks
+        )
+    }
+
+    suspend fun exportBackupFile(context: android.content.Context): android.net.Uri? {
+        val json = exportBackup()
+        return try {
+            val file = java.io.File(context.cacheDir, "glassplayer_playlists_backup.json")
+            file.writeText(json)
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to export backup file", e)
+            null
+        }
+    }
+
+    suspend fun exportXspfFile(context: android.content.Context): android.net.Uri? {
+        val playlists = allPlaylistsSnapshot()
+        val tracks = audioDao.getAllTracksSnapshot()
+        val xspf = BackupRestoreManager.exportXspf(
+            playlists = playlists,
+            getTracksInPlaylist = { playlistId -> audioDao.getTracksInPlaylistSnapshot(playlistId) },
+            allTracks = tracks
+        )
+        return try {
+            val file = java.io.File(context.cacheDir, "glassplayer_playlists.xspf")
+            file.writeText(xspf)
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to export xspf file", e)
+            null
+        }
+    }
+
     suspend fun importBackup(json: String): BackupRestoreManager.ImportResult {
         val tracks = audioDao.getAllTracksSnapshot()
         return BackupRestoreManager.importBackup(
             json = json,
             allTracks = tracks,
+            findOrInsertTrack = { track ->
+                val id = audioDao.insertTrack(track)
+                if (id > 0L) id.toInt()
+                else audioDao.getAllTracksSnapshot().find { it.uri == track.uri }?.id ?: 0
+            },
             createPlaylist = { name -> createPlaylist(name).toInt() },
             addTrackToPlaylist = { playlistId, trackId -> addTrackToPlaylist(playlistId, trackId) },
             updateFavorite = { id, favorite -> toggleFavorite(id, favorite) },

@@ -217,6 +217,23 @@ class AudioViewModel(
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    data class ExportDialogState(
+        val playlists: List<PlaylistEntity>,
+        val suggestedName: String
+    )
+
+    private val _exportDialogState = MutableStateFlow<ExportDialogState?>(null)
+    val exportDialogState: StateFlow<ExportDialogState?> = _exportDialogState.asStateFlow()
+
+    private val _importPreviewState = MutableStateFlow<PlaylistImportPreview?>(null)
+    val importPreviewState: StateFlow<PlaylistImportPreview?> = _importPreviewState.asStateFlow()
+
+    private val _backupProgress = MutableStateFlow<BackupProgress?>(null)
+    val backupProgress: StateFlow<BackupProgress?> = _backupProgress.asStateFlow()
+
+    private val _isBackupOperationRunning = MutableStateFlow(false)
+    val isBackupOperationRunning: StateFlow<Boolean> = _isBackupOperationRunning.asStateFlow()
+
     init {
         viewModelScope.launch {
             crossfadeSec.collect { engine.setCrossfadeSec(it) }
@@ -530,9 +547,148 @@ class AudioViewModel(
         }
     }
 
+    fun exportBackupFile(context: android.content.Context, onResult: (android.net.Uri?) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.exportBackupFile(context))
+        }
+    }
+
+    fun exportXspfFile(context: android.content.Context, onResult: (android.net.Uri?) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.exportXspfFile(context))
+        }
+    }
+
+    fun exportXspfString(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.exportXspfString())
+        }
+    }
+
     fun importBackup(json: String, onResult: (BackupRestoreManager.ImportResult) -> Unit) {
         viewModelScope.launch {
             onResult(repository.importBackup(json))
+        }
+    }
+
+    fun openExportDialog(playlists: List<PlaylistEntity>) {
+        if (playlists.isEmpty()) return
+        val suggestedName = when (playlists.size) {
+            1 -> BackupRestoreManager.sanitizeFileName(playlists.first().name)
+            else -> "glassplayer_playlists_${playlists.size}_backup"
+        }
+        _exportDialogState.value = ExportDialogState(playlists, suggestedName)
+    }
+
+    fun dismissExportDialog() {
+        _exportDialogState.value = null
+    }
+
+    fun openImportPreview(preview: PlaylistImportPreview) {
+        _importPreviewState.value = preview
+    }
+
+    fun dismissImportPreview() {
+        _importPreviewState.value = null
+    }
+
+    fun parseImportFile(
+        context: Context,
+        uri: Uri,
+        onPreviewReady: (PlaylistImportPreview) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isBackupOperationRunning.value = true
+            _backupProgress.value = BackupProgress(0, 100, "", "Inspecting backup file...")
+            try {
+                val (pkg, isZip) = repository.inspectBackupFromUri(context, uri)
+                if (pkg.playlists.isEmpty()) {
+                    onError("No playlists found in the backup file.")
+                    return@launch
+                }
+                _backupProgress.value = BackupProgress(50, 100, "", "Matching tracks with your library...")
+                val preview = repository.buildImportPreview(context, pkg, isZip, uri)
+                _importPreviewState.value = preview
+                onPreviewReady(preview)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to parse import file", e)
+                onError(e.message ?: "Failed to read backup file.")
+            } finally {
+                _isBackupOperationRunning.value = false
+                _backupProgress.value = null
+            }
+        }
+    }
+
+    fun executeExportToUri(
+        context: Context,
+        targetUri: Uri,
+        format: ExportFormatOption,
+        playlists: List<PlaylistEntity>,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isBackupOperationRunning.value = true
+            _backupProgress.value = BackupProgress(0, 100, "", "Preparing export...")
+            try {
+                when (format) {
+                    ExportFormatOption.PLAYLIST_ONLY -> {
+                        val json = repository.exportPackageJson(context, playlists)
+                        context.contentResolver.openOutputStream(targetUri)?.bufferedWriter(Charsets.UTF_8)?.use { writer ->
+                            writer.write(json)
+                        } ?: throw IllegalStateException("Could not open output stream for export.")
+                        onResult(true, "Exported ${playlists.size} playlist(s) successfully (.glassplaylist)")
+                    }
+                    ExportFormatOption.PLAYLIST_WITH_AUDIO -> {
+                        val os = context.contentResolver.openOutputStream(targetUri)
+                            ?: throw IllegalStateException("Could not open output stream for export.")
+                        val success = repository.exportPackageZip(context, os, playlists) { progress: BackupProgress ->
+                            _backupProgress.value = progress
+                        }
+                        if (success) {
+                            onResult(true, "Exported ${playlists.size} playlist(s) with audio files (.zip)")
+                        } else {
+                            onResult(false, "Failed to complete ZIP export")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Export execution error", e)
+                onResult(false, e.message ?: "Export failed")
+            } finally {
+                _isBackupOperationRunning.value = false
+                _backupProgress.value = null
+                _exportDialogState.value = null
+            }
+        }
+    }
+
+    fun executeImport(
+        context: Context,
+        preview: PlaylistImportPreview,
+        onResult: (PlaylistImportResult) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isBackupOperationRunning.value = true
+            try {
+                val result = repository.executeImport(context, preview) { progress ->
+                    _backupProgress.value = progress
+                }
+                _importPreviewState.value = null
+                onResult(result)
+            } catch (e: Exception) {
+                Log.e(tag, "Import execution failed", e)
+                onResult(
+                    PlaylistImportResult(
+                        success = false,
+                        errors = listOf(e.message ?: "Import execution error")
+                    )
+                )
+            } finally {
+                _isBackupOperationRunning.value = false
+                _backupProgress.value = null
+            }
         }
     }
 

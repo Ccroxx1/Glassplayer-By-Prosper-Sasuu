@@ -8,6 +8,8 @@ package com.example
 const val YOUTUBE_URI_PREFIX = "youtube://"
 const val YOUTUBE_CATEGORY_PREFIX = "yt:"
 const val FOLDER_YOUTUBE = "YouTube"
+const val UNAVAILABLE_URI_PREFIX = "offline://unavailable/"
+const val FOLDER_UNAVAILABLE = "Unavailable"
 
 enum class TrackSource {
     LOCAL,
@@ -62,6 +64,10 @@ fun AudioTrackEntity.youtubeVideoId(): String? {
         if (isPlausibleYouTubeVideoId(id)) return id
     }
     return null
+}
+
+fun AudioTrackEntity.isUnavailable(): Boolean {
+    return uri.startsWith(UNAVAILABLE_URI_PREFIX) || folderName == FOLDER_UNAVAILABLE || category == FOLDER_UNAVAILABLE
 }
 
 fun AudioTrackEntity.trackSource(): TrackSource {

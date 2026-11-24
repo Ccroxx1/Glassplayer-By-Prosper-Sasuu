@@ -142,6 +142,49 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
     ) { treeUri ->
         treeUri?.let { viewModel.importMusicFolder(it, context) }
     }
+
+    val exportDialogState by viewModel.exportDialogState.collectAsState()
+    val importPreviewState by viewModel.importPreviewState.collectAsState()
+    val backupProgress by viewModel.backupProgress.collectAsState()
+    val isBackupOperationRunning by viewModel.isBackupOperationRunning.collectAsState()
+
+    var pendingExportFormat by remember { mutableStateOf(ExportFormatOption.PLAYLIST_ONLY) }
+    var pendingExportPlaylists by remember { mutableStateOf<List<PlaylistEntity>>(emptyList()) }
+
+    val exportJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { targetUri ->
+        targetUri?.let {
+            viewModel.executeExportToUri(context, it, ExportFormatOption.PLAYLIST_ONLY, pendingExportPlaylists) { _, msg ->
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val exportZipLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { targetUri ->
+        targetUri?.let {
+            viewModel.executeExportToUri(context, it, ExportFormatOption.PLAYLIST_WITH_AUDIO, pendingExportPlaylists) { _, msg ->
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val importDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { sourceUri ->
+        sourceUri?.let {
+            viewModel.parseImportFile(
+                context = context,
+                uri = it,
+                onPreviewReady = { },
+                onError = { error ->
+                    Toast.makeText(context, "Import failed: $error", Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+    }
     val currentTrackForTheme by viewModel.currentTrack.collectAsState()
     val selectedThemeName by viewModel.colorTheme.collectAsState()
 
@@ -254,6 +297,9 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                         showSettings = false
                         showMusicSources = true
                     },
+                    onImportPlaylists = {
+                        importDocumentLauncher.launch(arrayOf("*/*"))
+                    },
                     strings = strings
                 )
             }
@@ -280,6 +326,47 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                     },
                     strings = strings
                 )
+            }
+
+            exportDialogState?.let { expState ->
+                ExportPlaylistDialog(
+                    state = expState,
+                    onDismiss = { viewModel.dismissExportDialog() },
+                    onConfirmExport = { format, fileName ->
+                        pendingExportFormat = format
+                        pendingExportPlaylists = expState.playlists
+                        if (format == ExportFormatOption.PLAYLIST_ONLY) {
+                            val safeName = if (fileName.endsWith(".glassplaylist", ignoreCase = true)) fileName else "$fileName.glassplaylist"
+                            exportJsonLauncher.launch(safeName)
+                        } else {
+                            val safeName = if (fileName.endsWith(".zip", ignoreCase = true)) fileName else "$fileName.zip"
+                            exportZipLauncher.launch(safeName)
+                        }
+                    },
+                    strings = strings
+                )
+            }
+
+            importPreviewState?.let { preview ->
+                ImportPlaylistPreviewDialog(
+                    preview = preview,
+                    onDismiss = { viewModel.dismissImportPreview() },
+                    onConfirmImport = { confirmedPreview ->
+                        viewModel.executeImport(context, confirmedPreview) { result ->
+                            val msg = if (result.success) {
+                                "Successfully restored ${result.playlistsImported + result.playlistsMerged + result.playlistsReplaced} playlist(s) (${result.tracksRestored} songs)!"
+                            } else {
+                                "Import finished with errors: ${result.errors.firstOrNull() ?: "Unknown error"}"
+                            }
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    strings = strings
+                )
+            }
+
+            if (isBackupOperationRunning) {
+                BackupProgressDialog(progress = backupProgress)
             }
 
             // Permanent Background Host for YouTube Music Playback
@@ -345,7 +432,7 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                                     .glassCard()
                             ) {
                                 when (activeTab) {
-                                    strings.browse -> TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, strings = strings)
+                                    strings.browse -> TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, onImportPlaylists = { importDocumentLauncher.launch(arrayOf("*/*")) }, strings = strings)
                                     strings.favorites -> FavoritesView(viewModel)
                                     strings.onlineMusic -> OnlineMusicView(viewModel = viewModel, strings = strings)
                                 }
@@ -376,7 +463,7 @@ fun GlassPlayerApp(viewModel: AudioViewModel) {
                                         .fillMaxSize()
                                         .glassCard()
                                 ) {
-                                    TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, strings = strings)
+                                    TrackBrowserView(viewModel, onAddSource = { showMusicSources = true }, onImportPlaylists = { importDocumentLauncher.launch(arrayOf("*/*")) }, strings = strings)
                                 }
                                 strings.favorites -> Box(
                                     modifier = Modifier
@@ -906,7 +993,7 @@ fun GlassHeader(
 }
 
 @Composable
-fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings: LanguageStrings) {
+fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, onImportPlaylists: () -> Unit = {}, strings: LanguageStrings) {
     val context = LocalContext.current
     val tracks by viewModel.allTracks.collectAsState()
     val allTracksRaw by viewModel.allTracksIncludingBlacklisted.collectAsState()
@@ -1070,7 +1157,17 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                     else viewModel.removeTracksFromLibrary(selectedTracks)
                     selection.exit()
                 },
-                onDeleteDevice = { showBulkDeleteDialog = true }
+                onDeleteDevice = { showBulkDeleteDialog = true },
+                onExportPlaylists = {
+                    val selectedIds = selection.selectedKeys
+                        .mapNotNull { it.removePrefix("playlist:").toIntOrNull() }
+                        .toSet()
+                    val chosen = playlists.filter { it.id in selectedIds }
+                    if (chosen.isNotEmpty()) {
+                        viewModel.openExportDialog(chosen)
+                    }
+                    selection.exit()
+                }
             )
             Spacer(modifier = Modifier.height(10.dp))
         } else {
@@ -1406,6 +1503,16 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                                     }
                                     IconButton(
                                         onClick = {
+                                            viewModel.openExportDialog(listOf(selectedPlaylist!!))
+                                        },
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .glassCard()
+                                    ) {
+                                        Icon(Icons.Rounded.Backup, contentDescription = strings.exportPlaylist, tint = GlassCyan)
+                                    }
+                                    IconButton(
+                                        onClick = {
                                             val m3u = viewModel.exportPlaylistAsM3u(selectedPlaylist!!.name, playlistTracks)
                                             val share = Intent(Intent.ACTION_SEND).apply {
                                                 type = "text/plain"
@@ -1479,17 +1586,48 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            Button(
-                                onClick = { showCreatePlaylistDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = GlassMagenta.copy(alpha = 0.15f)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, GlassMagenta.copy(alpha = 0.5f), RoundedCornerShape(24.dp)),
-                                contentPadding = PaddingValues(vertical = 12.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, tint = GlassMagenta)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Create New Playlist", color = Color.White)
+                                Button(
+                                    onClick = { showCreatePlaylistDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = GlassMagenta.copy(alpha = 0.15f)),
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .border(1.dp, GlassMagenta.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Add, contentDescription = null, tint = GlassMagenta, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Create", color = Color.White, fontSize = 13.sp, maxLines = 1)
+                                }
+                                Button(
+                                    onClick = onImportPlaylists,
+                                    colors = ButtonDefaults.buttonColors(containerColor = GlassCyan.copy(alpha = 0.15f)),
+                                    modifier = Modifier
+                                        .weight(1.1f)
+                                        .border(1.dp, GlassCyan.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.FolderZip, contentDescription = null, tint = GlassCyan, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(strings.import, color = Color.White, fontSize = 13.sp, maxLines = 1)
+                                }
+                                if (playlists.isNotEmpty()) {
+                                    Button(
+                                        onClick = { viewModel.openExportDialog(playlists) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                                        modifier = Modifier
+                                            .weight(1.1f)
+                                            .border(1.dp, GlassBorderWhite, RoundedCornerShape(20.dp)),
+                                        contentPadding = PaddingValues(vertical = 10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.Backup, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(strings.export, color = Color.White, fontSize = 13.sp, maxLines = 1)
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
@@ -1555,6 +1693,14 @@ fun TrackBrowserView(viewModel: AudioViewModel, onAddSource: () -> Unit, strings
                                             }
 
                                             if (!selection.active) {
+                                                IconButton(onClick = { viewModel.openExportDialog(listOf(playlist)) }) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.FileDownload,
+                                                        contentDescription = "Export Playlist",
+                                                        tint = GlassCyan.copy(alpha = 0.8f),
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
                                                 IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
                                                     Icon(
                                                         imageVector = Icons.Rounded.Delete,
@@ -2213,7 +2359,8 @@ private fun SelectionActionBar(
     onHide: () -> Unit,
     onRefresh: () -> Unit,
     onRemoveLibrary: () -> Unit,
-    onDeleteDevice: () -> Unit
+    onDeleteDevice: () -> Unit,
+    onExportPlaylists: () -> Unit = {}
 ) {
     val hasTracks = selectedTracks.isNotEmpty()
     Row(
@@ -2282,6 +2429,8 @@ private fun SelectionActionBar(
                 IconButton(onClick = onHide) { Icon(Icons.Rounded.VisibilityOff, "Hide", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp)) }
                 IconButton(onClick = onRemoveLibrary) { Icon(Icons.Rounded.RemoveCircleOutline, "Remove", tint = Color(0xFFFFB86B), modifier = Modifier.size(20.dp)) }
                 IconButton(onClick = onDeleteDevice) { Icon(Icons.Rounded.Delete, "Delete", tint = Color(0xFFFF6B6B), modifier = Modifier.size(20.dp)) }
+            } else if (kind == SelectionKind.PLAYLIST) {
+                IconButton(onClick = onExportPlaylists) { Icon(Icons.Rounded.FileDownload, "Export Playlists", tint = GlassCyan, modifier = Modifier.size(22.dp)) }
             }
         }
     }
@@ -2441,6 +2590,7 @@ fun TrackItemRow(
     isCurrentlyPlaying: Boolean,
     isPlayingActive: Boolean
 ) {
+    val context = LocalContext.current
     val playing = isCurrentlyPlaying
     val playingActive = isPlayingActive
     var showMenu by remember { mutableStateOf(false) }
@@ -2458,8 +2608,13 @@ fun TrackItemRow(
                 .listRowSurface(highlighted = playing || isSelected)
                 .combinedClickable(
                     onClick = {
-                        if (selectionEnabled && selection!!.active) selection.toggle(track.uri)
-                        else viewModel.playTrack(track, customQueue)
+                        if (selectionEnabled && selection!!.active) {
+                            selection.toggle(track.uri)
+                        } else if (track.isUnavailable()) {
+                            Toast.makeText(context, "This track is unavailable on this device", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.playTrack(track, customQueue)
+                        }
                     },
                     onLongClick = {
                         if (selectionEnabled) {
@@ -2509,6 +2664,18 @@ fun TrackItemRow(
                             fontSize = 10.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (track.isUnavailable()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Unavailable",
+                            color = Color(0xFFFFB86B),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(Color(0xFFFFB86B).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
                 }
@@ -3618,6 +3785,22 @@ fun MainPlayerView(viewModel: AudioViewModel) {
     var lastFmPasswordInput by remember { mutableStateOf("") }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var lyricsDraft by remember { mutableStateOf("") }
+
+    var pendingExportContent by remember { mutableStateOf("") }
+    val saveXspfFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/xspf+xml")
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.writer()?.use { writer ->
+                    writer.write(pendingExportContent)
+                }
+                Toast.makeText(context, "Playlist saved to local storage (.xspf)", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to save file: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     if (currentTrack == null) {
         Box(
@@ -4792,18 +4975,62 @@ fun MainPlayerView(viewModel: AudioViewModel) {
                     }
                 },
                 confirmButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            viewModel.exportBackup { backupPayload = it }
-                        }) {
-                            Text("Backup", color = GlassCyan)
-                        }
-                        TextButton(onClick = {
-                            viewModel.importBackup(backupPayload) { result ->
-                                actionMessage = "Restored ${result.playlistsRestored} playlists, ${result.tracksPatched} tracks"
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                viewModel.exportBackup { backupPayload = it }
+                            }) {
+                                Text("Backup Text", color = GlassCyan)
                             }
-                        }) {
-                            Text("Restore", color = GlassMagenta)
+                            TextButton(onClick = {
+                                viewModel.exportBackupFile(context) { uri ->
+                                    if (uri != null) {
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "application/json"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Export All Playlists (.json)"))
+                                    } else {
+                                        Toast.makeText(context, "Failed to export backup file", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }) {
+                                Text("Export Single File (.json)", color = GlassMagenta)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                viewModel.importBackup(backupPayload) { result ->
+                                    actionMessage = "Restored ${result.playlistsRestored} playlists, ${result.tracksPatched} tracks"
+                                }
+                            }) {
+                                Text("Restore from Text", color = GlassCyan)
+                            }
+                            TextButton(onClick = {
+                                viewModel.exportXspfFile(context) { uri ->
+                                    if (uri != null) {
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "application/xspf+xml"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Export VLC Playlist (.xspf)"))
+                                    } else {
+                                        Toast.makeText(context, "Failed to export .xspf file", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }) {
+                                Text("Export VLC Playlist (.xspf)", color = GlassCyan)
+                            }
+                            TextButton(onClick = {
+                                viewModel.exportXspfString { xspf ->
+                                    pendingExportContent = xspf
+                                    saveXspfFileLauncher.launch("glassplayer_playlists.xspf")
+                                }
+                            }) {
+                                Text("Save .xspf to Local Storage", color = GlassMagenta)
+                            }
                         }
                     }
                 },
@@ -5721,7 +5948,7 @@ fun PreferencesDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, strings:
 }
 
 @Composable
-fun SettingsDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, onManageSources: () -> Unit, strings: LanguageStrings) {
+fun SettingsDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, onManageSources: () -> Unit, onImportPlaylists: () -> Unit = {}, strings: LanguageStrings) {
     val context = LocalContext.current
     val lastFmUser by viewModel.lastFmUsername.collectAsState()
 
@@ -5814,32 +6041,30 @@ fun SettingsDialog(viewModel: AudioViewModel, onDismiss: () -> Unit, onManageSou
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val playlists by viewModel.allPlaylists.collectAsState()
                         Button(
                             onClick = {
-                                viewModel.exportBackup { json ->
-                                    println("BACKUP_EXPORT: $json")
-                                    Toast.makeText(context, "Backup JSON printed to console", Toast.LENGTH_SHORT).show()
-                                }
+                                viewModel.openExportDialog(playlists)
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Rounded.Backup, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Backup, null, tint = GlassCyan, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(strings.export, color = Color.White)
+                            Text(strings.exportAllPlaylists, color = Color.White, fontSize = 11.sp, maxLines = 1)
                         }
                         Button(
                             onClick = {
-                                Toast.makeText(context, "Import Backup feature coming soon", Toast.LENGTH_SHORT).show()
+                                onImportPlaylists()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Rounded.Restore, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Restore, null, tint = GlassMagenta, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(strings.import, color = Color.White)
+                            Text(strings.importPlaylist, color = Color.White, fontSize = 11.sp, maxLines = 1)
                         }
                     }
                 }
